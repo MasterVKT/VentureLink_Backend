@@ -1,0 +1,3168 @@
+Architecture Backend VentureLink
+Ce document décrit l'architecture complète du backend de l'application VentureLink, développée avec Django et Django REST Framework. Il sert de référence principale pour l'équipe backend et définit l'organisation du code, les patterns utilisés, et les choix techniques.
+1. Vue d'ensemble
+1.1 Principes architecturaux
+Le backend de VentureLink suit une architecture basée sur Django, avec une organisation en couches permettant une séparation claire des responsabilités:
+•	Modèles: Représentation des données et de la logique métier
+•	Vues/API: Traitement des requêtes et génération des réponses
+•	Services: Encapsulation des opérations complexes
+•	Repositories: Abstraction de l'accès aux données (optionnel)
+Cette architecture respecte les principes suivants:
+•	DRY (Don't Repeat Yourself): Éviter la duplication de code
+•	SOC (Separation of Concerns): Séparer clairement les responsabilités
+•	KISS (Keep It Simple, Stupid): Privilégier les solutions simples
+•	YAGNI (You Aren't Gonna Need It): N'implémenter que ce qui est nécessaire
+•	API-first: Conception orientée API pour faciliter l'intégration frontend
+1.2 Stack technologique
+•	Framework: Django 4.2+
+•	API: Django REST Framework
+•	Base de données: PostgreSQL
+•	Cache: Redis
+•	Authentification: JWT avec Firebase Auth
+•	Stockage de fichiers: Système de fichiers + CDN
+•	Monitoring: Sentry, Prometheus
+•	Documentation API: Swagger/OpenAPI
+•	Tests: pytest
+•	CI/CD: GitHub Actions
+•	Déploiement: Docker, Kubernetes
+2. Structure du projet
+2.1 Organisation des dossiers
+venture_link_project/
+├── manage.py                           # Script de gestion Django
+├── venture_link_project/               # Configuration racine
+│   ├── __init__.py
+│   ├── asgi.py
+│   ├── settings/                       # Configuration par environnement
+│   │   ├── __init__.py
+│   │   ├── base.py                     # Configuration de base
+│   │   ├── development.py              # Configuration de développement
+│   │   ├── production.py               # Configuration de production
+│   │   └── test.py                     # Configuration de test
+│   ├── urls.py                         # URLs racine
+│   └── wsgi.py
+├── apps/                               # Applications Django
+│   ├── core/                           # Application noyau
+│   │   ├── __init__.py
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── migrations/
+│   │   ├── models.py                   # Modèles partagés
+│   │   ├── utils.py                    # Utilitaires communs
+│   │   ├── permissions.py              # Permissions personnalisées
+│   │   └── exceptions.py               # Exceptions personnalisées
+│   ├── users/                          # Application utilisateurs
+│   │   ├── __init__.py
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── models/                     # Modèles utilisateur
+│   │   │   ├── __init__.py
+│   │   │   ├── user.py
+│   │   │   ├── profile.py
+│   │   │   └── subscription.py
+│   │   ├── serializers/                # Sérialiseurs REST
+│   │   │   ├── __init__.py
+│   │   │   ├── user_serializer.py
+│   │   │   ├── profile_serializer.py
+│   │   │   └── subscription_serializer.py
+│   │   ├── views/                      # Vues API
+│   │   │   ├── __init__.py
+│   │   │   ├── user_views.py
+│   │   │   ├── profile_views.py
+│   │   │   └── subscription_views.py
+│   │   ├── services/                   # Services métier
+│   │   │   ├── __init__.py
+│   │   │   ├── user_service.py
+│   │   │   └── subscription_service.py
+│   │   ├── urls.py                     # URLs de l'app
+│   │   └── tests/                      # Tests
+│   │       ├── __init__.py
+│   │       ├── test_models.py
+│   │       ├── test_serializers.py
+│   │       ├── test_views.py
+│   │       └── test_services.py
+│   ├── projects/                       # Application projets
+│   │   ├── __init__.py
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── models/
+│   │   │   ├── __init__.py
+│   │   │   ├── project.py
+│   │   │   ├── category.py
+│   │   │   ├── tag.py
+│   │   │   ├── media.py
+│   │   │   ├── interest.py
+│   │   │   └── question.py
+│   │   ├── serializers/
+│   │   ├── views/
+│   │   ├── services/
+│   │   ├── urls.py
+│   │   └── tests/
+│   ├── messaging/                      # Application messagerie
+│   │   ├── __init__.py
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── models/
+│   │   ├── serializers/
+│   │   ├── views/
+│   │   ├── services/
+│   │   ├── urls.py
+│   │   └── tests/
+│   └── notifications/                  # Application notifications
+│       ├── __init__.py
+│       ├── admin.py
+│       ├── apps.py
+│       ├── models/
+│       ├── serializers/
+│       ├── views/
+│       ├── services/
+│       ├── urls.py
+│       └── tests/
+├── config/                             # Configuration externe
+│   ├── firebase-admin-sdk.json         # Clé Firebase Admin SDK
+│   └── nginx.conf                      # Configuration nginx
+├── requirements/                       # Dépendances par environnement
+│   ├── base.txt                        # Dépendances de base
+│   ├── development.txt                 # Dépendances de développement
+│   ├── production.txt                  # Dépendances de production
+│   └── test.txt                        # Dépendances de test
+├── scripts/                            # Scripts utilitaires
+│   ├── setup_dev.sh
+│   ├── backup_db.sh
+│   └── deploy.sh
+├── static/                             # Fichiers statiques collectés
+├── media/                              # Uploads utilisateur
+├── templates/                          # Templates Django (admin, emails)
+├── docs/                               # Documentation
+├── .dockerignore
+├── .gitignore
+├── docker-compose.yml
+├── Dockerfile
+└── README.md
+2.2 Organisation des modèles
+Pour les applications complexes, les modèles sont répartis dans des fichiers séparés pour faciliter la maintenance:
+# apps/projects/models/__init__.py
+from .project import Project, ProjectView
+from .category import ProjectCategory
+from .tag import ProjectTag, ProjectTagRelation
+from .media import ProjectMedia
+from .interest import ProjectInterest, ProjectInterestSkill
+from .question import ProjectQuestion, ProjectQuestionAnswer
+
+# apps/projects/models/project.py
+from django.db import models
+from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import get_user_model
+from apps.core.models import TimeStampedModel, UUIDModel
+
+User = get_user_model()
+
+class Project(TimeStampedModel, UUIDModel):
+    """
+    Modèle représentant un projet.
+    """
+    STAGE_CHOICES = (
+        ('IDEA', _('Idea')),
+        ('PROTOTYPE', _('Prototype')),
+        ('DEVELOPMENT', _('Development')),
+        ('GROWTH', _('Growth')),
+    )
+
+    STATUS_CHOICES = (
+        ('ACTIVE', _('Active')),
+        ('INACTIVE', _('Inactive')),
+        ('FUNDED', _('Funded')),
+        ('ARCHIVED', _('Archived')),
+    )
+
+    creator = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='created_projects',
+        verbose_name=_('Creator')
+    )
+    title = models.CharField(_('Title'), max_length=100)
+    short_description = models.TextField(_('Short description'), max_length=280)
+    full_description = models.TextField(_('Full description'), max_length=5000)
+    category = models.ForeignKey(
+        'ProjectCategory',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='projects',
+        verbose_name=_('Category')
+    )
+    stage = models.CharField(
+        _('Stage'),
+        max_length=20,
+        choices=STAGE_CHOICES,
+        default='IDEA'
+    )
+    funding_min = models.DecimalField(
+        _('Minimum funding'),
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    funding_max = models.DecimalField(
+        _('Maximum funding'),
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    funding_currency = models.CharField(
+        _('Currency'),
+        max_length=3,
+        default='EUR'
+    )
+    location_country = models.CharField(
+        _('Country'),
+        max_length=100,
+        null=True,
+        blank=True
+    )
+    location_city = models.CharField(
+        _('City'),
+        max_length=100,
+        null=True,
+        blank=True
+    )
+    tags = models.ManyToManyField(
+        'ProjectTag',
+        through='ProjectTagRelation',
+        related_name='projects',
+        verbose_name=_('Tags')
+    )
+    is_premium = models.BooleanField(_('Premium'), default=False)
+    is_featured = models.BooleanField(_('Featured'), default=False)
+    is_draft = models.BooleanField(_('Draft'), default=False)
+    status = models.CharField(
+        _('Status'),
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='ACTIVE'
+    )
+    views_count = models.PositiveIntegerField(_('Views count'), default=0)
+    interests_count = models.PositiveIntegerField(_('Interests count'), default=0)
+    favorites_count = models.PositiveIntegerField(_('Favorites count'), default=0)
+    published_at = models.DateTimeField(_('Published at'), null=True, blank=True)
+    business_plan = models.FileField(
+        _('Business plan'),
+        upload_to='projects/business_plans/',
+        null=True,
+        blank=True
+    )
+    video_url = models.URLField(_('Video URL'), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _('Project')
+        verbose_name_plural = _('Projects')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['creator', '-created_at']),
+            models.Index(fields=['category', '-created_at']),
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['stage', '-created_at']),
+            models.Index(fields=['location_country', '-created_at']),
+            models.Index(fields=['-views_count']),
+            models.Index(fields=['-interests_count']),
+        ]
+
+    def __str__(self):
+        return self.title
+
+    def increment_views(self):
+        """Incrémente le compteur de vues"""
+        self.views_count += 1
+        self.save(update_fields=['views_count'])
+
+    def increment_interests(self):
+        """Incrémente le compteur d'intérêts"""
+        self.interests_count += 1
+        self.save(update_fields=['interests_count'])
+
+    def increment_favorites(self):
+        """Incrémente le compteur de favoris"""
+        self.favorites_count += 1
+        self.save(update_fields=['favorites_count'])
+
+    def decrement_favorites(self):
+        """Décrémente le compteur de favoris"""
+        if self.favorites_count > 0:
+            self.favorites_count -= 1
+            self.save(update_fields=['favorites_count'])
+
+    @property
+    def primary_image(self):
+        """Retourne l'image principale du projet"""
+        return self.media.filter(is_primary=True).first()
+
+    @property
+    def all_media(self):
+        """Retourne tous les médias du projet, triés par ordre"""
+        return self.media.all().order_by('order')
+
+class ProjectView(TimeStampedModel, UUIDModel):
+    """
+    Modèle pour tracer les vues d'un projet
+    """
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name='views',
+        verbose_name=_('Project')
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='project_views',
+        verbose_name=_('User')
+    )
+    ip_address = models.GenericIPAddressField(
+        _('IP address'),
+        null=True,
+        blank=True
+    )
+    user_agent = models.TextField(_('User agent'), null=True, blank=True)
+    duration = models.PositiveIntegerField(
+        _('Duration (seconds)'),
+        null=True,
+        blank=True
+    )
+    referrer = models.URLField(_('Referrer'), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _('Project view')
+        verbose_name_plural = _('Project views')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['project', '-created_at']),
+            models.Index(fields=['user', '-created_at']),
+        ]
+2.3 Organisation des vues API
+Utilisation de ViewSets pour regrouper les opérations CRUD:
+# apps/projects/views/project_views.py
+from rest_framework import viewsets, mixins, status, filters
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+
+from apps.core.permissions import IsProjectOwnerOrReadOnly, IsPremiumUser
+from apps.projects.models import Project, ProjectInterest, ProjectMedia
+from apps.projects.serializers import (
+    ProjectSerializer, ProjectDetailSerializer, ProjectCreateSerializer,
+    ProjectUpdateSerializer, ProjectInterestSerializer, ProjectMediaSerializer
+)
+from apps.projects.filters import ProjectFilter
+from apps.projects.services import ProjectService
+
+class ProjectViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint qui permet de gérer les projets.
+    """
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = ProjectFilter
+    search_fields = ['title', 'short_description', 'full_description']
+    ordering_fields = ['created_at', 'views_count', 'interests_count', 'favorites_count']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        """
+        Retourne les projets visibles, avec des filtres supplémentaires
+        pour les utilisateurs authentifiés.
+        """
+        if self.request.user.is_authenticated:
+            # Utilisateurs authentifiés peuvent voir leurs projets en brouillon
+            if self.action == 'list':
+                return Project.objects.filter(
+                    models.Q(is_draft=False, status='ACTIVE') | 
+                    models.Q(creator=self.request.user)
+                )
+            return Project.objects.all()
+        # Utilisateurs anonymes ne voient que les projets publiés
+        return Project.objects.filter(is_draft=False, status='ACTIVE')
+
+    def get_serializer_class(self):
+        """
+        Utilise différents sérialiseurs selon l'action.
+        """
+        if self.action == 'create':
+            return ProjectCreateSerializer
+        if self.action == 'update' or self.action == 'partial_update':
+            return ProjectUpdateSerializer
+        if self.action == 'retrieve':
+            return ProjectDetailSerializer
+        return ProjectSerializer
+
+    def get_permissions(self):
+        """
+        Définit les permissions selon l'action.
+        """
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'publish']:
+            return [IsAuthenticated(), IsProjectOwnerOrReadOnly()]
+        if self.action in ['upload_business_plan']:
+            return [IsAuthenticated(), IsProjectOwnerOrReadOnly(), IsPremiumUser()]
+        return super().get_permissions()
+    
+    def perform_create(self, serializer):
+        """
+        Définit le créateur lors de la création d'un projet.
+        """
+        serializer.save(creator=self.request.user)
+    
+    @extend_schema(
+        summary="Publier un projet en brouillon",
+        description="Passe un projet de l'état brouillon à publié",
+        responses={200: ProjectDetailSerializer}
+    )
+    @action(detail=True, methods=['post'], url_path='publish')
+    def publish(self, request, pk=None):
+        """
+        Publie un projet qui était en brouillon.
+        """
+        project = self.get_object()
+        service = ProjectService()
+        
+        published_project = service.publish_project(project)
+        
+        serializer = ProjectDetailSerializer(
+            published_project,
+            context={'request': request}
+        )
+        return Response(serializer.data)
+    
+    @extend_schema(
+        summary="Ajouter un média au projet",
+        description="Télécharge un fichier média (image, document) pour le projet",
+        responses={201: ProjectMediaSerializer}
+    )
+    @action(detail=True, methods=['post'], url_path='media')
+    def upload_media(self, request, pk=None):
+        """
+        Télécharge un média pour un projet.
+        """
+        project = self.get_object()
+        file = request.FILES.get('file')
+        
+        if not file:
+            return Response(
+                {'error': 'Aucun fichier fourni'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        service = ProjectService()
+        media = service.add_project_media(
+            project=project,
+            file=file,
+            title=request.data.get('title'),
+            description=request.data.get('description'),
+            is_primary=request.data.get('is_primary', False),
+            order=request.data.get('order', 0)
+        )
+        
+        serializer = ProjectMediaSerializer(media)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    @extend_schema(
+        summary="Télécharger un business plan (Premium)",
+        description="Télécharge un business plan PDF pour le projet (réservé aux utilisateurs Premium)",
+        responses={200: ProjectDetailSerializer}
+    )
+    @action(detail=True, methods=['post'], url_path='business-plan')
+    def upload_business_plan(self, request, pk=None):
+        """
+        Télécharge un business plan (PDF) pour un projet.
+        Réservé aux utilisateurs Premium.
+        """
+        project = self.get_object()
+        file = request.FILES.get('file')
+        
+        if not file:
+            return Response(
+                {'error': 'Aucun fichier fourni'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        service = ProjectService()
+        updated_project = service.add_business_plan(project, file)
+        
+        serializer = ProjectDetailSerializer(
+            updated_project,
+            context={'request': request}
+        )
+        return Response(serializer.data)
+    
+    @extend_schema(
+        summary="Exprimer un intérêt pour un projet",
+        description="Marquer son intérêt pour un projet avec un message optionnel",
+        responses={201: ProjectInterestSerializer}
+    )
+    @action(detail=True, methods=['post'], url_path='interest')
+    def express_interest(self, request, pk=None):
+        """
+        Exprime un intérêt pour un projet.
+        """
+        project = self.get_object()
+        
+        # Vérifier si l'utilisateur a déjà exprimé son intérêt
+        if ProjectInterest.objects.filter(
+            project=project, 
+            user=request.user,
+            status__in=['PENDING', 'ACCEPTED']
+        ).exists():
+            return Response(
+                {'error': 'Vous avez déjà exprimé votre intérêt pour ce projet'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Vérifier que l'utilisateur n'est pas le créateur du projet
+        if project.creator == request.user:
+            return Response(
+                {'error': 'Vous ne pouvez pas exprimer un intérêt pour votre propre projet'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = ProjectInterestSerializer(data=request.data)
+        if serializer.is_valid():
+            interest = serializer.save(
+                project=project,
+                user=request.user,
+                status='PENDING'
+            )
+            
+            # Incrémenter le compteur d'intérêts
+            project.increment_interests()
+            
+            # Créer une notification pour le créateur du projet
+            from apps.notifications.services import NotificationService
+            notification_service = NotificationService()
+            notification_service.create_interest_notification(interest)
+            
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @extend_schema(
+        summary="Ajouter aux favoris",
+        description="Ajouter un projet à ses favoris avec des notes optionnelles",
+        responses={201: {'type': 'object', 'properties': {'id': {'type': 'string'}}}}
+    )
+    @action(detail=True, methods=['post'], url_path='favorite')
+    def add_to_favorites(self, request, pk=None):
+        """
+        Ajoute un projet aux favoris de l'utilisateur.
+        """
+        project = self.get_object()
+        
+        service = ProjectService()
+        favorite = service.add_to_favorites(
+            project=project,
+            user=request.user,
+            notes=request.data.get('notes')
+        )
+        
+        # Incrémenter le compteur de favoris
+        project.increment_favorites()
+        
+        return Response({'id': str(favorite.id)}, status=status.HTTP_201_CREATED)
+    
+    @extend_schema(
+        summary="Retirer des favoris",
+        description="Retirer un projet de ses favoris",
+        responses={204: None}
+    )
+    @action(detail=True, methods=['delete'], url_path='favorite')
+    def remove_from_favorites(self, request, pk=None):
+        """
+        Retire un projet des favoris de l'utilisateur.
+        """
+        project = self.get_object()
+        
+        service = ProjectService()
+        removed = service.remove_from_favorites(
+            project=project,
+            user=request.user
+        )
+        
+        if removed:
+            # Décrémenter le compteur de favoris
+            project.decrement_favorites()
+        
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    @extend_schema(
+        summary="Obtenir les statistiques du projet (Premium)",
+        description="Obtenir des statistiques détaillées sur un projet (réservé aux utilisateurs Premium)",
+        responses={200: {'type': 'object'}}
+    )
+    @action(detail=True, methods=['get'], url_path='analytics', permission_classes=[IsAuthenticated, IsProjectOwnerOrReadOnly, IsPremiumUser])
+    def analytics(self, request, pk=None):
+        """
+        Obtient des statistiques détaillées sur un projet.
+        Réservé aux utilisateurs Premium qui sont propriétaires du projet.
+        """
+        project = self.get_object()
+        
+        service = ProjectService()
+        analytics_data = service.get_project_analytics(project)
+        
+        return Response(analytics_data)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Surcharge pour enregistrer les vues de projet.
+        """
+        instance = self.get_object()
+        
+        # Enregistrer la vue si ce n'est pas le créateur du projet
+        if request.user != instance.creator:
+            service = ProjectService()
+            service.record_project_view(
+                project=instance,
+                user=request.user if request.user.is_authenticated else None,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
+                referrer=request.META.get('HTTP_REFERER')
+            )
+        
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+3. Architecture en couches
+3.1 Modèles
+Les modèles Django représentent les données et la logique métier de base. Pour faciliter la réutilisation, nous utilisons des modèles abstraits:
+# apps/core/models.py
+import uuid
+from django.db import models
+from django.utils.translation import gettext_lazy as _
+
+class TimeStampedModel(models.Model):
+    """
+    Modèle abstrait avec horodatage de création et mise à jour.
+    """
+    created_at = models.DateTimeField(_('Created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('Updated at'), auto_now=True)
+
+    class Meta:
+        abstract = True
+
+class UUIDModel(models.Model):
+    """
+    Modèle abstrait avec identifiant UUID.
+    """
+    id = models.UUIDField(
+        _('ID'),
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+
+    class Meta:
+        abstract = True
+3.2 Vues et Endpoints API
+L'API REST est construite avec Django REST Framework, en utilisant des ViewSets pour organiser logiquement les opérations CRUD:
+# apps/users/views/user_views.py
+from rest_framework import viewsets, status, mixins
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from drf_spectacular.utils import extend_schema
+
+from django.contrib.auth import get_user_model
+
+from apps.users.serializers import (
+    UserSerializer, ProfileSerializer, UserPasswordChangeSerializer
+)
+from apps.users.services import UserService
+
+User = get_user_model()
+
+class UserViewSet(mixins.RetrieveModelMixin,
+                  mixins.UpdateModelMixin,
+                  viewsets.GenericViewSet):
+    """
+    API endpoint pour gérer les utilisateurs.
+    Ne permet que la récupération et la mise à jour, pas la création ou suppression.
+    """
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Un utilisateur ne peut voir que son propre profil.
+        """
+        return User.objects.filter(id=self.request.user.id)
+
+    @extend_schema(
+        summary="Obtenir l'utilisateur courant",
+        description="Retourne les informations de l'utilisateur authentifié",
+        responses={200: UserSerializer}
+    )
+    @action(detail=False, methods=['get'], url_path='me')
+    def me(self, request):
+        """
+        Retourne les informations de l'utilisateur authentifié.
+        """
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary="Mettre à jour l'utilisateur courant",
+        description="Met à jour les informations de l'utilisateur authentifié",
+        responses={200: UserSerializer}
+    )
+    @action(detail=False, methods=['put', 'patch'], url_path='me')
+    def update_me(self, request):
+        """
+        Met à jour les informations de l'utilisateur authentifié.
+        """
+        user = request.user
+        partial = request.method == 'PATCH'
+        serializer = self.get_serializer(user, data=request.data, partial=partial)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @extend_schema(
+        summary="Changer le mot de passe",
+        description="Permet à l'utilisateur de changer son mot de passe",
+        responses={200: {'type': 'object', 'properties': {'message': {'type': 'string'}}}}
+    )
+    @action(detail=False, methods=['put'], url_path='password', serializer_class=UserPasswordChangeSerializer)
+    def change_password(self, request):
+        """
+        Permet à l'utilisateur de changer son mot de passe.
+        """
+        serializer = UserPasswordChangeSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            user_service = UserService()
+            
+            if not user_service.check_password(request.user, serializer.validated_data['current_password']):
+                return Response(
+                    {'current_password': ['Mot de passe incorrect']},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            user_service.change_password(request.user, serializer.validated_data['new_password'])
+            
+            return Response({'message': 'Mot de passe modifié avec succès'})
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+3.3 Sérialiseurs
+Les sérialiseurs convertissent les objets Python en JSON et vice versa:
+# apps/projects/serializers/project_serializer.py
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+
+from apps.projects.models import (
+    Project, ProjectCategory, ProjectTag, ProjectMedia
+)
+from apps.users.serializers import UserBasicSerializer
+
+User = get_user_model()
+
+class ProjectCategorySerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les catégories de projets.
+    """
+    class Meta:
+        model = ProjectCategory
+        fields = ['id', 'name', 'icon', 'color']
+
+class ProjectTagSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les tags de projets.
+    """
+    class Meta:
+        model = ProjectTag
+        fields = ['id', 'name', 'slug']
+
+class ProjectMediaSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les médias de projets.
+    """
+    class Meta:
+        model = ProjectMedia
+        fields = ['id', 'file', 'file_type', 'title', 'description', 'is_primary', 'order', 'created_at']
+        read_only_fields = ['id', 'file_type', 'created_at']
+
+class ProjectSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour la liste des projets.
+    """
+    creator = UserBasicSerializer(read_only=True)
+    category = ProjectCategorySerializer(read_only=True)
+    tags = ProjectTagSerializer(many=True, read_only=True)
+    primary_image = serializers.SerializerMethodField()
+    is_favorite = serializers.SerializerMethodField()
+    has_expressed_interest = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Project
+        fields = [
+            'id', 'title', 'short_description', 'creator', 'category',
+            'stage', 'primary_image', 'funding_min', 'funding_max', 
+            'funding_currency', 'location_country', 'location_city',
+            'views_count', 'interests_count', 'favorites_count',
+            'tags', 'is_premium', 'is_featured', 'created_at',
+            'updated_at', 'published_at', 'is_favorite', 'has_expressed_interest'
+        ]
+        read_only_fields = [
+            'id', 'creator', 'views_count', 'interests_count', 
+            'favorites_count', 'created_at', 'updated_at', 'published_at',
+            'is_favorite', 'has_expressed_interest'
+        ]
+    
+    def get_primary_image(self, obj):
+        """
+        Retourne l'URL de l'image principale du projet.
+        """
+        media = obj.primary_image
+        if media:
+            return self.context['request'].build_absolute_uri(media.file.url)
+        return None
+    
+    def get_is_favorite(self, obj):
+        """
+        Indique si le projet est dans les favoris de l'utilisateur.
+        """
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.favorites.filter(user=request.user).exists()
+        return False
+    
+    def get_has_expressed_interest(self, obj):
+        """
+        Indique si l'utilisateur a exprimé son intérêt pour le projet.
+        """
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.interests.filter(
+                user=request.user,
+                status__in=['PENDING', 'ACCEPTED']
+            ).exists()
+        return False
+
+class ProjectCreateSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour la création de projets.
+    """
+    class Meta:
+        model = Project
+        fields = [
+            'title', 'short_description', 'full_description', 'category',
+            'stage', 'funding_min', 'funding_max', 'funding_currency',
+            'location_country', 'location_city', 'is_draft', 'video_url'
+        ]
+    
+    def validate(self, data):
+        """
+        Validation supplémentaire.
+        """
+        # Vérifier que funding_min est inférieur à funding_max
+        if (data.get('funding_min') and data.get('funding_max') and 
+            data['funding_min'] >= data['funding_max']):
+            raise serializers.ValidationError(
+                "Le financement minimum doit être inférieur au financement maximum"
+            )
+        
+        # Vérifier les limites de caractères selon le statut premium
+        user = self.context['request'].user
+        is_premium = hasattr(user, 'subscription') and user.subscription.is_active and user.subscription.plan in ['PREMIUM_MONTHLY', 'PREMIUM_YEARLY']
+        
+        if not is_premium and len(data.get('full_description', '')) > 2000:
+            raise serializers.ValidationError(
+                "La description complète est limitée à 2000 caractères pour les utilisateurs standard"
+            )
+        
+        # Vérifier le nombre de projets actifs autorisés
+        active_projects_count = Project.objects.filter(
+            creator=user,
+            is_draft=False,
+            status='ACTIVE'
+        ).count()
+        
+        max_allowed = 5 if is_premium else 2
+        if active_projects_count >= max_allowed and not data.get('is_draft', False):
+            raise serializers.ValidationError(
+                f"Vous avez atteint la limite de {max_allowed} projets actifs"
+            )
+        
+        return data
+
+class ProjectDetailSerializer(ProjectSerializer):
+    """
+    Sérialiseur pour le détail d'un projet.
+    """
+    media = ProjectMediaSerializer(many=True, read_only=True, source='all_media')
+    
+    class Meta(ProjectSerializer.Meta):
+        fields = ProjectSerializer.Meta.fields + [
+            'full_description', 'media', 'business_plan', 'is_draft', 'status'
+        ]
+        read_only_fields = ProjectSerializer.Meta.read_only_fields + [
+            'business_plan'
+        ]
+
+class ProjectUpdateSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour la mise à jour de projets.
+    """
+    class Meta:
+        model = Project
+        fields = [
+            'title', 'short_description', 'full_description', 'category',
+            'stage', 'funding_min', 'funding_max', 'funding_currency',
+            'location_country', 'location_city', 'is_draft', 'status', 'video_url'
+        ]
+    
+    def validate(self, data):
+        """
+        Validation supplémentaire.
+        """
+        # Vérifier que funding_min est inférieur à funding_max
+        if ('funding_min' in data and 'funding_max' in data and 
+            data['funding_min'] >= data['funding_max']):
+            raise serializers.ValidationError(
+                "Le financement minimum doit être inférieur au financement maximum"
+            )
+        
+        # Vérifier les limites de caractères selon le statut premium
+        user = self.context['request'].user
+        is_premium = hasattr(user, 'subscription') and user.subscription.is_active and user.subscription.plan in ['PREMIUM_MONTHLY', 'PREMIUM_YEARLY']
+        
+        if not is_premium and 'full_description' in data and len(data['full_description']) > 2000:
+            raise serializers.ValidationError(
+                "La description complète est limitée à 2000 caractères pour les utilisateurs standard"
+            )
+        
+        return data
+3.4 Services
+La logique métier complexe est encapsulée dans des services:
+# apps/projects/services/project_service.py
+from django.utils import timezone
+from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
+from django.contrib.auth import get_user_model
+from django.db.models import F
+import os
+
+from apps.projects.models import (
+    Project, ProjectMedia, ProjectView, ProjectFavorite,
+    ProjectTag, ProjectTagRelation
+)
+from apps.core.exceptions import (
+    LimitReachedException, PermissionDeniedException
+)
+
+User = get_user_model()
+
+class ProjectService:
+    """
+    Service pour la gestion des projets.
+    """
+    
+    def publish_project(self, project):
+        """
+        Publie un projet qui était en brouillon.
+        """
+        if not project.is_draft:
+            return project
+        
+        # Vérifier que l'utilisateur n'a pas dépassé sa limite de projets actifs
+        user = project.creator
+        is_premium = hasattr(user, 'subscription') and user.subscription.is_active and user.subscription.plan in ['PREMIUM_MONTHLY', 'PREMIUM_YEARLY']
+        
+        active_projects_count = Project.objects.filter(
+            creator=user,
+            is_draft=False,
+            status='ACTIVE'
+        ).count()
+        
+        max_allowed = 5 if is_premium else 2
+        if active_projects_count >= max_allowed:
+            raise LimitReachedException(
+                f"Vous avez atteint la limite de {max_allowed} projets actifs"
+            )
+        
+        # Mettre à jour le projet
+        project.is_draft = False
+        project.published_at = timezone.now()
+        project.save()
+        
+        return project
+    
+    def add_project_media(self, project, file, title=None, description=None, is_primary=False, order=0):
+        """
+        Ajoute un média à un projet.
+        """
+        # Vérifier les limites de médias selon le statut premium
+        user = project.creator
+        is_premium = hasattr(user, 'subscription') and user.subscription.is_active and user.subscription.plan in ['PREMIUM_MONTHLY', 'PREMIUM_YEARLY']
+        
+        media_count = project.media.count()
+        max_allowed = 10 if is_premium else 3
+        
+        if media_count >= max_allowed:
+            raise LimitReachedException(
+                f"Vous avez atteint la limite de {max_allowed} médias par projet"
+            )
+        
+        # Déterminer le type de fichier
+        file_extension = os.path.splitext(file.name)[1].lower()
+        if file_extension in ['.jpg', '.jpeg', '.png', '.gif']:
+            file_type = 'IMAGE'
+        elif file_extension in ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']:
+            file_type = 'DOCUMENT'
+        elif file_extension in ['.mp4', '.mov', '.avi']:
+            file_type = 'VIDEO'
+        else:
+            raise ValidationError("Type de fichier non supporté")
+        
+        # Vérifier la taille du fichier
+        max_size = 10 * 1024 * 1024  # 10 MB
+        if file.size > max_size:
+            raise ValidationError("Fichier trop volumineux (maximum 10 MB)")
+        
+        # Si c'est l'image principale, désactiver les autres images principales
+        if is_primary:
+            project.media.filter(is_primary=True).update(is_primary=False)
+        
+        # Créer le média
+        media = ProjectMedia.objects.create(
+            project=project,
+            file=file,
+            file_type=file_type,
+            title=title,
+            description=description,
+            is_primary=is_primary,
+            order=order
+        )
+        
+        return media
+    
+    def add_business_plan(self, project, file):
+        """
+        Ajoute un business plan à un projet.
+        Réservé aux utilisateurs Premium.
+        """
+        # Vérifier que le fichier est un PDF
+        if not file.name.endswith('.pdf'):
+            raise ValidationError("Le business plan doit être au format PDF")
+        
+        # Vérifier la taille du fichier
+        max_size = 10 * 1024 * 1024  # 10 MB
+        if file.size > max_size:
+            raise ValidationError("Fichier trop volumineux (maximum 10 MB)")
+        
+        # Mettre à jour le projet
+        project.business_plan = file
+        project.save()
+        
+        return project
+    
+    def record_project_view(self, project, user=None, ip_address=None, user_agent=None, referrer=None):
+        """
+        Enregistre une vue de projet.
+        """
+        # Vérifier si l'utilisateur ou l'IP a déjà vu ce projet récemment
+        if user:
+            recent_view = ProjectView.objects.filter(
+                project=project,
+                user=user,
+                created_at__gte=timezone.now() - timezone.timedelta(hours=1)
+            ).exists()
+        elif ip_address:
+            recent_view = ProjectView.objects.filter(
+                project=project,
+                ip_address=ip_address,
+                created_at__gte=timezone.now() - timezone.timedelta(hours=1)
+            ).exists()
+        else:
+            recent_view = False
+        
+        # Si c'est une nouvelle vue, incrémenter le compteur
+        if not recent_view:
+            project.increment_views()
+        
+        # Enregistrer la vue
+        return ProjectView.objects.create(
+            project=project,
+            user=user,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            referrer=referrer
+        )
+    
+    def add_to_favorites(self, project, user, notes=None):
+        """
+        Ajoute un projet aux favoris d'un utilisateur.
+        """
+        # Vérifier si le projet est déjà dans les favoris
+        if ProjectFavorite.objects.filter(project=project, user=user).exists():
+            # Mettre à jour les notes si nécessaire
+            favorite = ProjectFavorite.objects.get(project=project, user=user)
+            if notes is not None:
+                favorite.notes = notes
+                favorite.save()
+            return favorite
+        
+        # Vérifier les limites de favoris pour les utilisateurs standard
+        is_premium = hasattr(user, 'subscription') and user.subscription.is_active and user.subscription.plan in ['PREMIUM_MONTHLY', 'PREMIUM_YEARLY']
+        
+        if not is_premium:
+            favorites_count = ProjectFavorite.objects.filter(user=user).count()
+            max_allowed = 15
+            
+            if favorites_count >= max_allowed:
+                raise LimitReachedException(
+                    f"Vous avez atteint la limite de {max_allowed} projets favoris"
+                )
+        
+        # Créer le favori
+        return ProjectFavorite.objects.create(
+            project=project,
+            user=user,
+            notes=notes
+        )
+    
+    def remove_from_favorites(self, project, user):
+        """
+        Retire un projet des favoris d'un utilisateur.
+        """
+        deleted, _ = ProjectFavorite.objects.filter(
+            project=project,
+            user=user
+        ).delete()
+        
+        return deleted > 0
+    
+    @transaction.atomic
+    def add_tags_to_project(self, project, tag_names):
+        """
+        Ajoute des tags à un projet.
+        """
+        # Vérifier les limites de tags selon le statut premium
+        user = project.creator
+        is_premium = hasattr(user, 'subscription') and user.subscription.is_active and user.subscription.plan in ['PREMIUM_MONTHLY', 'PREMIUM_YEARLY']
+        
+        max_allowed = 15 if is_premium else 5
+        
+        if len(tag_names) > max_allowed:
+            raise LimitReachedException(
+                f"Vous avez atteint la limite de {max_allowed} tags par projet"
+            )
+        
+        # Supprimer les tags existants
+        ProjectTagRelation.objects.filter(project=project).delete()
+        
+        # Ajouter les nouveaux tags
+        tags = []
+        for name in tag_names:
+            # Nettoyer le nom du tag
+            name = name.strip().lower()
+            if not name:
+                continue
+            
+            # Créer ou récupérer le tag
+            tag, created = ProjectTag.objects.get_or_create(
+                name=name,
+                defaults={
+                    'name_en': name,
+                    'name_fr': name,
+                    'slug': name.replace(' ', '-')
+                }
+            )
+            
+            # Créer la relation
+            ProjectTagRelation.objects.create(project=project, tag=tag)
+            tags.append(tag)
+        
+        return tags
+    
+    def get_project_analytics(self, project):
+        """
+        Retourne des statistiques détaillées sur un projet.
+        Réservé aux utilisateurs Premium.
+        """
+        # Statistiques de vues
+        now = timezone.now()
+        views_by_day = []
+        
+        # Derniers 30 jours
+        for i in range(30, -1, -1):
+            date = now - timezone.timedelta(days=i)
+            count = ProjectView.objects.filter(
+                project=project,
+                created_at__date=date.date()
+            ).count()
+            
+            views_by_day.append({
+                'date': date.date().isoformat(),
+                'count': count
+            })
+        
+        # Vues par pays
+        views_by_country = []
+        country_counts = ProjectView.objects.filter(
+            project=project
+        ).values('user__profile__location_country').annotate(
+            count=models.Count('id')
+        ).order_by('-count')[:10]
+        
+        for item in country_counts:
+            country = item['user__profile__location_country'] or 'Inconnu'
+            views_by_country.append({
+                'country': country,
+                'count': item['count']
+            })
+        
+        # Statistiques d'intérêts
+        interests_by_day = []
+        
+        # Derniers 30 jours
+        for i in range(30, -1, -1):
+            date = now - timezone.timedelta(days=i)
+            count = project.interests.filter(
+                created_at__date=date.date()
+            ).count()
+            
+            interests_by_day.append({
+                'date': date.date().isoformat(),
+                'count': count
+            })
+        
+        # Taux de conversion
+        total_views = project.views_count
+        total_interests = project.interests_count
+        conversion_rate = (total_interests / total_views * 100) if total_views > 0 else 0
+        
+        # Visiteurs récents
+        recent_viewers = []
+        recent_views = ProjectView.objects.filter(
+            project=project,
+            user__isnull=False
+        ).select_related('user').order_by('-created_at')[:10]
+        
+        for view in recent_views:
+            recent_viewers.append({
+                'user': {
+                    'id': str(view.user.id),
+                    'first_name': view.user.first_name,
+                    'last_name': view.user.last_name,
+                    'profile_picture': view.user.profile.profile_picture.url if view.user.profile.profile_picture else None,
+                    'title': view.user.profile.title
+                },
+                'view_date': view.created_at.isoformat(),
+                'duration': view.duration
+            })
+        
+        # Résultat
+        return {
+            'views': {
+                'total': total_views,
+                'by_day': views_by_day,
+                'by_country': views_by_country
+            },
+            'interests': {
+                'total': total_interests,
+                'by_day': interests_by_day,
+                'conversion_rate': conversion_rate
+            },
+            'visitors': {
+                'total': ProjectView.objects.filter(project=project).count(),
+                'unique': ProjectView.objects.filter(project=project).values('user', 'ip_address').distinct().count(),
+                'returning': ProjectView.objects.filter(project=project).values('user', 'ip_address').annotate(count=models.Count('id')).filter(count__gt=1).count(),
+                'avg_view_duration': ProjectView.objects.filter(project=project, duration__isnull=False).aggregate(avg=models.Avg('duration'))['avg'] or 0
+            },
+            'recent_viewers': recent_viewers
+        }
+3.5 Configuration des URLs
+Les URLs sont organisées de manière hiérarchique:
+# venture_link_project/urls.py
+from django.contrib import admin
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+
+urlpatterns = [
+    # Admin
+    path('admin/', admin.site.urls),
+    
+    # API
+    path('api/v1/', include('apps.core.urls')),
+    path('api/v1/auth/', include('apps.users.urls.auth')),
+    path('api/v1/users/', include('apps.users.urls.users')),
+    path('api/v1/projects/', include('apps.projects.urls')),
+    path('api/v1/messaging/', include('apps.messaging.urls')),
+    path('api/v1/notifications/', include('apps.notifications.urls')),
+    path('api/v1/subscriptions/', include('apps.users.urls.subscriptions')),
+    
+    # Documentation API
+    path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/v1/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/v1/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+]
+
+# Servir les fichiers médias en développement
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# apps/projects/urls.py
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+
+from apps.projects.views import (
+    ProjectViewSet, ProjectCategoryViewSet, ProjectMediaViewSet,
+    ProjectQuestionViewSet, ProjectInterestViewSet
+)
+
+router = DefaultRouter()
+router.register(r'', ProjectViewSet, basename='project')
+router.register(r'categories', ProjectCategoryViewSet, basename='project-category')
+router.register(r'questions', ProjectQuestionViewSet, basename='project-question')
+router.register(r'interests', ProjectInterestViewSet, basename='project-interest')
+router.register(r'(?P<project_id>[^/.]+)/media', ProjectMediaViewSet, basename='project-media')
+
+urlpatterns = [
+    path('', include(router.urls)),
+]
+4. Authentification et Sécurité
+4.1 Intégration Firebase Authentication
+L'authentification est gérée via Firebase Authentication, avec JWT pour les sessions:
+# apps/users/authentication.py
+import firebase_admin
+from firebase_admin import auth
+from rest_framework import authentication
+from rest_framework.exceptions import AuthenticationFailed
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
+
+from apps.users.models import UserProfile
+
+User = get_user_model()
+
+class FirebaseAuthentication(authentication.BaseAuthentication):
+    """
+    Authentification via Firebase Auth Token.
+    """
+    
+    def authenticate(self, request):
+        """
+        Authentifie l'utilisateur via le token Firebase.
+        """
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        if not auth_header:
+            return None
+        
+        id_token = auth_header.split(' ').pop()
+        if not id_token:
+            return None
+        
+        try:
+            # Vérifier le token avec Firebase
+            decoded_token = auth.verify_id_token(id_token)
+            uid = decoded_token.get('uid')
+            
+            if not uid:
+                raise AuthenticationFailed(_('Invalid token'))
+            
+            # Récupérer ou créer l'utilisateur
+            user, created = self.get_or_create_user(decoded_token)
+            
+            return (user, id_token)
+        except auth.InvalidIdTokenError:
+            raise AuthenticationFailed(_('Invalid token'))
+        except auth.ExpiredIdTokenError:
+            raise AuthenticationFailed(_('Token expired'))
+        except Exception as e:
+            raise AuthenticationFailed(str(e))
+    
+    def get_or_create_user(self, decoded_token):
+        """
+        Récupère ou crée l'utilisateur correspondant au token Firebase.
+        """
+        uid = decoded_token.get('uid')
+        email = decoded_token.get('email', '')
+        
+        # Chercher l'utilisateur par uid Firebase
+        user = User.objects.filter(firebase_uid=uid).first()
+        
+        if user:
+            return user, False
+        
+        # Chercher l'utilisateur par email
+        user = User.objects.filter(email=email).first()
+        
+        if user:
+            # Mettre à jour l'uid Firebase
+            user.firebase_uid = uid
+            user.save()
+            return user, False
+        
+        # Créer un nouvel utilisateur
+        name_parts = decoded_token.get('name', '').split(' ', 1)
+        first_name = name_parts[0] if name_parts else ''
+        last_name = name_parts[1] if len(name_parts) > 1 else ''
+        
+        user = User.objects.create(
+            email=email,
+            firebase_uid=uid,
+            username=email,  # Utiliser l'email comme nom d'utilisateur
+            first_name=first_name,
+            last_name=last_name,
+            is_active=True,
+            is_verified=decoded_token.get('email_verified', False)
+        )
+        
+        # Créer un profil vide
+        UserProfile.objects.create(user=user)
+        
+        return user, True
+4.2 Permissions et autorisations
+Les permissions personnalisées contrôlent l'accès aux ressources:
+# apps/core/permissions.py
+from rest_framework import permissions
+
+class IsProjectOwnerOrReadOnly(permissions.BasePermission):
+    """
+    Permission qui autorise uniquement le créateur du projet à le modifier.
+    Les autres utilisateurs peuvent seulement lire.
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        # Les méthodes de lecture sont toujours autorisées
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        
+        # L'écriture n'est autorisée qu'au créateur
+        return obj.creator == request.user
+
+class IsPremiumUser(permissions.BasePermission):
+    """
+    Permission qui autorise uniquement les utilisateurs premium.
+    """
+    
+    def has_permission(self, request, view):
+        user = request.user
+        
+        # Vérifier si l'utilisateur a un abonnement premium actif
+        return (
+            hasattr(user, 'subscription') and 
+            user.subscription.is_active and 
+            user.subscription.plan in ['PREMIUM_MONTHLY', 'PREMIUM_YEARLY']
+        )
+
+class IsConversationParticipant(permissions.BasePermission):
+    """
+    Permission qui autorise uniquement les participants d'une conversation.
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        # Vérifier si l'utilisateur est un participant
+        return obj.participants.filter(id=request.user.id).exists()
+4.3 Middleware de limitation de débit
+Protection contre les abus avec un middleware de rate limiting:
+# apps/core/middleware.py
+from django.conf import settings
+from django.core.cache import cache
+from django.utils.translation import gettext_lazy as _
+from rest_framework.exceptions import Throttled
+import time
+
+class RateLimitMiddleware:
+    """
+    Middleware pour limiter le nombre de requêtes par utilisateur.
+    """
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        # Ignorer le rate limiting pour certaines URL
+        if self._should_skip_rate_limiting(request):
+            return self.get_response(request)
+        
+        # Obtenir la clé de cache basée sur l'IP ou l'utilisateur
+        key = self._get_cache_key(request)
+        
+        # Obtenir le taux limite en fonction de la méthode
+        if request.method == 'GET':
+            rate_limit = settings.RATE_LIMIT_GET
+        else:
+            rate_limit = settings.RATE_LIMIT_OTHER
+        
+        # Vérifier si l'utilisateur a dépassé la limite
+        current_count = cache.get(key, 0)
+        
+        if current_count >= rate_limit:
+            retry_after = self._get_retry_after()
+            raise Throttled(
+                detail=_('Request limit exceeded. Please try again later.'),
+                wait=retry_after
+            )
+        
+        # Incrémenter le compteur
+        if current_count == 0:
+            cache.set(key, 1, settings.RATE_LIMIT_WINDOW)
+        else:
+            cache.incr(key)
+        
+        return self.get_response(request)
+    
+    def _should_skip_rate_limiting(self, request):
+        """
+        Détermine si le rate limiting doit être ignoré pour cette requête.
+        """
+        # Ignorer les requêtes d'administration
+        if request.path.startswith('/admin/'):
+            return True
+        
+        # Ignorer les utilisateurs superutilisateurs
+        if hasattr(request, 'user') and request.user.is_authenticated and request.user.is_superuser:
+            return True
+        
+        return False
+    
+    def _get_cache_key(self, request):
+        """
+        Génère une clé de cache basée sur l'utilisateur ou l'IP.
+        """
+        if request.user.is_authenticated:
+            identifier = f"user_{request.user.id}"
+        else:
+            identifier = f"ip_{self._get_client_ip(request)}"
+        
+        method_group = 'get' if request.method == 'GET' else 'other'
+        
+        return f"ratelimit:{identifier}:{method_group}"
+    
+    def _get_client_ip(self, request):
+        """
+        Récupère l'adresse IP du client.
+        """
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+    
+    def _get_retry_after(self):
+        """
+        Calcule le temps d'attente avant la prochaine requête.
+        """
+        return settings.RATE_LIMIT_WINDOW
+5. Gestion de la base de données
+5.1 Optimisation des requêtes
+Utilisation de techniques d'optimisation pour les requêtes complexes:
+# apps/projects/views/project_views.py (méthode optimisée)
+def get_queryset(self):
+    """
+    Retourne les projets avec les relations précargées pour éviter les requêtes N+1.
+    """
+    queryset = Project.objects.select_related(
+        'creator',
+        'creator__profile',
+        'category'
+    ).prefetch_related(
+        'tags',
+        'media',
+        Prefetch('media', queryset=ProjectMedia.objects.filter(is_primary=True), to_attr='primary_media')
+    )
+    
+    # Filtrer selon l'utilisateur authentifié
+    if self.request.user.is_authenticated:
+        if self.action == 'list':
+            return queryset.filter(
+                models.Q(is_draft=False, status='ACTIVE') | 
+                models.Q(creator=self.request.user)
+            )
+        
+        # Précharger les favoris et intérêts de l'utilisateur courant
+        user_id = self.request.user.id
+        queryset = queryset.prefetch_related(
+            Prefetch('favorites', queryset=ProjectFavorite.objects.filter(user_id=user_id), to_attr='user_favorites'),
+            Prefetch('interests', queryset=ProjectInterest.objects.filter(user_id=user_id), to_attr='user_interests')
+        )
+        
+        return queryset
+    
+    # Utilisateurs anonymes ne voient que les projets publiés
+    return queryset.filter(is_draft=False, status='ACTIVE')
+5.2 Indexation
+Création d'index pour améliorer les performances:
+# apps/projects/models/project.py (extrait avec les index)
+class Meta:
+    verbose_name = _('Project')
+    verbose_name_plural = _('Projects')
+    ordering = ['-created_at']
+    indexes = [
+        models.Index(fields=['creator', '-created_at']),
+        models.Index(fields=['category', '-created_at']),
+        models.Index(fields=['status', '-created_at']),
+        models.Index(fields=['stage', '-created_at']),
+        models.Index(fields=['location_country', '-created_at']),
+        models.Index(fields=['-views_count']),
+        models.Index(fields=['-interests_count']),
+    ]
+5.3 Migrations
+Gestion des migrations et de l'évolution du schéma:
+# apps/projects/migrations/0001_initial.py
+from django.db import migrations, models
+import django.db.models.deletion
+import uuid
+
+class Migration(migrations.Migration):
+
+    initial = True
+
+    dependencies = [
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='ProjectCategory',
+            fields=[
+                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Created at')),
+                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated at')),
+                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False, verbose_name='ID')),
+                ('name', models.CharField(max_length=100, unique=True, verbose_name='Name')),
+                ('name_en', models.CharField(max_length=100, verbose_name='English name')),
+                ('name_fr', models.CharField(max_length=100, verbose_name='French name')),
+                ('description', models.TextField(blank=True, null=True, verbose_name='Description')),
+                ('icon', models.CharField(blank=True, max_length=50, null=True, verbose_name='Icon')),
+                ('color', models.CharField(default='#1877F2', max_length=7, verbose_name='Color')),
+                ('parent', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='children', to='projects.projectcategory', verbose_name='Parent category')),
+            ],
+            options={
+                'verbose_name': 'Project category',
+                'verbose_name_plural': 'Project categories',
+                'ordering': ['name'],
+            },
+        ),
+        # Autres modèles...
+    ]
+6. Intégration Firebase
+6.1 Firebase Admin SDK
+Configuration et initialisation du SDK Admin:
+# venture_link_project/settings/base.py
+import firebase_admin
+from firebase_admin import credentials
+
+# Configuration Firebase Admin SDK
+FIREBASE_CREDENTIALS_PATH = os.environ.get(
+    'FIREBASE_CREDENTIALS_PATH',
+    os.path.join(BASE_DIR, 'config', 'firebase-admin-sdk.json')
+)
+
+# Initialiser Firebase Admin SDK
+try:
+    cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
+    firebase_admin.initialize_app(cred)
+except Exception as e:
+    print(f"Erreur lors de l'initialisation de Firebase Admin SDK: {e}")
+6.2 Service de notifications
+Envoi de notifications via Firebase Cloud Messaging:
+# apps/notifications/services/notification_service.py
+from firebase_admin import messaging
+import logging
+
+from django.db import transaction
+from django.utils import timezone
+
+from apps.notifications.models import Notification, FCMNotification
+from apps.projects.models import ProjectInterest
+from apps.messaging.models import Message
+
+logger = logging.getLogger(__name__)
+
+class NotificationService:
+    """
+    Service pour la gestion des notifications.
+    """
+    
+    @transaction.atomic
+    def create_interest_notification(self, interest):
+        """
+        Crée une notification pour un nouvel intérêt sur un projet.
+        """
+        recipient = interest.project.creator
+        sender = interest.user
+        
+        notification = Notification.objects.create(
+            recipient=recipient,
+            sender=sender,
+            notification_type='NEW_INTEREST',
+            title="Nouvel intérêt pour votre projet",
+            message=f"{sender.first_name} {sender.last_name} est intéressé par votre projet {interest.project.title}",
+            entity_type='PROJECT_INTEREST',
+            entity_id=interest.id,
+            action_url=f"/projects/{interest.project.id}/interests/{interest.id}"
+        )
+        
+        # Envoyer la notification push
+        self.send_push_notification(notification)
+        
+        return notification
+    
+    @transaction.atomic
+    def create_message_notification(self, message):
+        """
+        Crée une notification pour un nouveau message.
+        """
+        sender = message.sender
+        conversation = message.conversation
+        
+        # Envoyer une notification à tous les participants sauf l'expéditeur
+        for participant in conversation.participants.exclude(id=sender.id):
+            notification = Notification.objects.create(
+                recipient=participant,
+                sender=sender,
+                notification_type='NEW_MESSAGE',
+                title="Nouveau message",
+                message=f"{sender.first_name} {sender.last_name} vous a envoyé un message",
+                entity_type='MESSAGE',
+                entity_id=message.id,
+                action_url=f"/conversations/{conversation.id}"
+            )
+            
+            # Envoyer la notification push
+            self.send_push_notification(notification)
+    
+    def send_push_notification(self, notification):
+        """
+        Envoie une notification push via Firebase Cloud Messaging.
+        """
+        # Vérifier si le destinataire a un token FCM
+        fcm_token = notification.recipient.fcm_token
+        if not fcm_token:
+            return
+        
+        # Créer le message FCM
+        push_notification = messaging.Notification(
+            title=notification.title,
+            body=notification.message
+        )
+        
+        # Données pour le traitement côté client
+        data = {
+            'type': notification.notification_type,
+            'entity_id': str(notification.entity_id) if notification.entity_id else '',
+            'entity_type': notification.entity_type or '',
+            'action_url': notification.action_url or '',
+            'notification_id': str(notification.id)
+        }
+        
+        # Déterminer le canal de notification Android
+        android_channel_id = self._get_android_channel_id(notification.notification_type)
+        
+        # Créer le message complet
+        message = messaging.Message(
+            notification=push_notification,
+            data=data,
+            token=fcm_token,
+            android=messaging.AndroidConfig(
+                priority='high',
+                notification=messaging.AndroidNotification(
+                    channel_id=android_channel_id
+                )
+            ),
+            apns=messaging.APNSConfig(
+                headers={'apns-priority': '10'},
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(
+                        badge=1,
+                        sound='default'
+                    )
+                )
+            )
+        )
+        
+        # Enregistrer la tentative d'envoi
+        fcm_notification = FCMNotification.objects.create(
+            notification=notification,
+            fcm_token=fcm_token,
+            status='PENDING'
+        )
+        
+        # Envoyer la notification
+        try:
+            response = messaging.send(message)
+            fcm_notification.status = 'SENT'
+            fcm_notification.sent_at = timezone.now()
+            fcm_notification.save()
+            
+            # Marquer la notification comme livrée
+            notification.delivered = True
+            notification.delivered_at = timezone.now()
+            notification.save()
+            
+            return response
+        except Exception as e:
+            logger.error(f"Erreur lors de l'envoi de la notification FCM: {e}")
+            fcm_notification.status = 'FAILED'
+            fcm_notification.error_message = str(e)
+            fcm_notification.save()
+            return None
+    
+    def _get_android_channel_id(self, notification_type):
+        """
+        Détermine le canal de notification Android approprié.
+        """
+        if notification_type == 'NEW_MESSAGE':
+            return 'messages'
+        elif notification_type in ['NEW_INTEREST', 'INTEREST_ACCEPTED', 'INTEREST_REJECTED']:
+            return 'interests'
+        elif notification_type in ['PROJECT_QUESTION', 'QUESTION_ANSWERED']:
+            return 'questions'
+        else:
+            return 'general'
+7. Traitement asynchrone et tâches de fond
+7.1 Tâches Celery
+Configuration et utilisation de Celery pour les tâches asynchrones:
+# venture_link_project/celery.py
+import os
+from celery import Celery
+
+# Définir les variables d'environnement Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'venture_link_project.settings')
+
+app = Celery('venture_link')
+
+# Configuration depuis les paramètres Django
+app.config_from_object('django.conf:settings', namespace='CELERY')
+
+# Découverte automatique des tâches
+app.autodiscover_tasks()
+
+@app.task(bind=True)
+def debug_task(self):
+    print(f'Request: {self.request!r}')
+# apps/notifications/tasks.py
+from celery import shared_task
+import logging
+
+from apps.notifications.services import NotificationService
+from apps.notifications.models import Notification
+
+logger = logging.getLogger(__name__)
+
+@shared_task
+def send_push_notification(notification_id):
+    """
+    Tâche Celery pour l'envoi asynchrone de notifications push.
+    """
+    try:
+        notification = Notification.objects.get(id=notification_id)
+        service = NotificationService()
+        service.send_push_notification(notification)
+    except Notification.DoesNotExist:
+        logger.error(f"Notification {notification_id} introuvable")
+    except Exception as e:
+        logger.error(f"Erreur lors de l'envoi de la notification push: {e}")
+
+@shared_task
+def send_daily_summary_notifications():
+    """
+    Tâche Celery pour l'envoi quotidien de résumés de notifications.
+    """
+    from django.db.models import Count
+    from django.contrib.auth import get_user_model
+    
+    User = get_user_model()
+    service = NotificationService()
+    
+    # Trouver les utilisateurs avec des notifications non lues
+    users_with_unread = User.objects.annotate(
+        unread_count=Count('notifications_received', filter=models.Q(notifications_received__is_read=False))
+    ).filter(unread_count__gt=0)
+    
+    for user in users_with_unread:
+        unread_count = user.unread_count
+        
+        # Créer une notification de résumé
+        notification = Notification.objects.create(
+            recipient=user,
+            notification_type='SUMMARY',
+            title="Résumé de vos notifications",
+            message=f"Vous avez {unread_count} notifications non lues",
+            action_url="/notifications"
+        )
+        
+        # Envoyer la notification push
+        service.send_push_notification(notification)
+7.2 Signaux Django
+Utilisation des signaux pour des actions automatiques:
+# apps/projects/signals.py
+from django.db.models.signals import post_save, pre_delete
+from django.dispatch import receiver
+
+from apps.projects.models import ProjectInterest, ProjectFavorite
+from apps.notifications.tasks import send_push_notification
+from apps.notifications.models import Notification
+
+@receiver(post_save, sender=ProjectInterest)
+def handle_project_interest_creation(sender, instance, created, **kwargs):
+    """
+    Gestionnaire de signal pour la création d'un intérêt pour un projet.
+    Crée une notification et envoie une notification push au créateur du projet.
+    """
+    if created:
+        from apps.notifications.services import NotificationService
+        service = NotificationService()
+        
+        # Créer la notification
+        notification = service.create_interest_notification(instance)
+        
+        # Envoyer la notification push de manière asynchrone
+        send_push_notification.delay(notification.id)
+
+@receiver(post_save, sender=ProjectFavorite)
+def handle_project_favorite_creation(sender, instance, created, **kwargs):
+    """
+    Gestionnaire de signal pour l'ajout d'un projet aux favoris.
+    Incrémente le compteur de favoris du projet.
+    """
+    if created:
+        project = instance.project
+        project.increment_favorites()
+
+@receiver(pre_delete, sender=ProjectFavorite)
+def handle_project_favorite_deletion(sender, instance, **kwargs):
+    """
+    Gestionnaire de signal pour la suppression d'un favori.
+    Décrémente le compteur de favoris du projet.
+    """
+    project = instance.project
+    project.decrement_favorites()
+8. Tests
+8.1 Tests unitaires
+Tests des modèles, services et autres composants:
+# apps/projects/tests/test_models.py
+import pytest
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+
+from apps.projects.models import Project, ProjectCategory
+
+User = get_user_model()
+
+@pytest.mark.django_db
+class TestProjectModel:
+    """
+    Tests pour le modèle Project.
+    """
+    
+    def test_project_creation(self, user_factory, project_category_factory):
+        """
+        Test de création d'un projet.
+        """
+        # Créer un utilisateur et une catégorie
+        user = user_factory()
+        category = project_category_factory()
+        
+        # Créer un projet
+        project = Project.objects.create(
+            creator=user,
+            title="Projet de test",
+            short_description="Description courte",
+            full_description="Description complète",
+            category=category,
+            stage="PROTOTYPE",
+            funding_min=50000,
+            funding_max=100000,
+            funding_currency="EUR",
+            location_country="France",
+            location_city="Paris"
+        )
+        
+        # Vérifier que le projet a été créé
+        assert Project.objects.count() == 1
+        assert str(project) == "Projet de test"
+        assert project.creator == user
+        assert project.category == category
+        assert project.stage == "PROTOTYPE"
+        assert project.funding_min == 50000
+        assert project.funding_max == 100000
+        assert project.funding_currency == "EUR"
+        assert project.location_country == "France"
+        assert project.location_city == "Paris"
+        assert project.views_count == 0
+        assert project.interests_count == 0
+        assert project.favorites_count == 0
+        assert project.is_premium is False
+        assert project.is_featured is False
+        assert project.is_draft is False
+        assert project.status == "ACTIVE"
+    
+    def test_increment_views(self, project_factory):
+        """
+        Test de l'incrémentation du compteur de vues.
+        """
+        # Créer un projet
+        project = project_factory()
+        initial_views = project.views_count
+        
+        # Incrémenter les vues
+        project.increment_views()
+        
+        # Vérifier que le compteur a été incrémenté
+        project.refresh_from_db()
+        assert project.views_count == initial_views + 1
+    
+    def test_increment_interests(self, project_factory):
+        """
+        Test de l'incrémentation du compteur d'intérêts.
+        """
+        # Créer un projet
+        project = project_factory()
+        initial_interests = project.interests_count
+        
+        # Incrémenter les intérêts
+        project.increment_interests()
+        
+        # Vérifier que le compteur a été incrémenté
+        project.refresh_from_db()
+        assert project.interests_count == initial_interests + 1
+    
+    def test_increment_and_decrement_favorites(self, project_factory):
+        """
+        Test de l'incrémentation et décrémentation du compteur de favoris.
+        """
+        # Créer un projet
+        project = project_factory()
+        initial_favorites = project.favorites_count
+        
+        # Incrémenter les favoris
+        project.increment_favorites()
+        
+        # Vérifier que le compteur a été incrémenté
+        project.refresh_from_db()
+        assert project.favorites_count == initial_favorites + 1
+        
+        # Décrémenter les favoris
+        project.decrement_favorites()
+        
+        # Vérifier que le compteur a été décrémenté
+        project.refresh_from_db()
+        assert project.favorites_count == initial_favorites
+8.2 Tests d'API
+Tests des endpoints API:
+# apps/projects/tests/test_views.py
+import pytest
+from django.urls import reverse
+from rest_framework import status
+
+@pytest.mark.django_db
+class TestProjectViewSet:
+    """
+    Tests pour le ViewSet Project.
+    """
+    
+    def test_list_projects_unauthenticated(self, client, project_factory):
+        """
+        Test de récupération des projets pour un utilisateur non authentifié.
+        """
+        # Créer quelques projets
+        project_factory(is_draft=False, status="ACTIVE")
+        project_factory(is_draft=False, status="ACTIVE")
+        project_factory(is_draft=True, status="ACTIVE")  # Brouillon
+        
+        # Récupérer la liste des projets
+        url = reverse('project-list')
+        response = client.get(url)
+        
+        # Vérifier la réponse
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data['data']) == 2  # Seulement les projets publiés
+    
+    def test_list_projects_authenticated(self, auth_client, user_factory, project_factory):
+        """
+        Test de récupération des projets pour un utilisateur authentifié.
+        """
+        # Créer un utilisateur
+        user = user_factory()
+        
+        # Créer quelques projets
+        project1 = project_factory(is_draft=False, status="ACTIVE")
+        project2 = project_factory(is_draft=False, status="ACTIVE")
+        project3 = project_factory(is_draft=True, status="ACTIVE", creator=user)  # Brouillon de l'utilisateur
+        project_factory(is_draft=True, status="ACTIVE")  # Brouillon d'un autre utilisateur
+        
+        # Récupérer la liste des projets
+        url = reverse('project-list')
+        response = auth_client(user).get(url)
+        
+        # Vérifier la réponse
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data['data']) == 3  # Projets publiés + brouillons de l'utilisateur
+        assert {p['id'] for p in response.data['data']} == {str(project1.id), str(project2.id), str(project3.id)}
+    
+    def test_create_project(self, auth_client, user_factory, project_category_factory):
+        """
+        Test de création d'un projet.
+        """
+        # Créer un utilisateur et une catégorie
+        user = user_factory()
+        category = project_category_factory()
+        
+        # Données du projet
+        project_data = {
+            'title': 'Nouveau projet',
+            'short_description': 'Description courte',
+            'full_description': 'Description complète',
+            'category': str(category.id),
+            'stage': 'PROTOTYPE',
+            'funding_min': 50000,
+            'funding_max': 100000,
+            'funding_currency': 'EUR',
+            'location_country': 'France',
+            'location_city': 'Paris',
+            'is_draft': False
+        }
+        
+        # Créer le projet
+        url = reverse('project-list')
+        response = auth_client(user).post(url, project_data, format='json')
+        
+        # Vérifier la réponse
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data['title'] == 'Nouveau projet'
+        assert response.data['short_description'] == 'Description courte'
+        assert response.data['full_description'] == 'Description complète'
+        assert response.data['category']['id'] == str(category.id)
+        assert response.data['stage'] == 'PROTOTYPE'
+        assert response.data['funding_min'] == 50000
+        assert response.data['funding_max'] == 100000
+        assert response.data['funding_currency'] == 'EUR'
+        assert response.data['location_country'] == 'France'
+        assert response.data['location_city'] == 'Paris'
+        assert response.data['is_draft'] is False
+    
+    def test_retrieve_project(self, client, project_factory):
+        """
+        Test de récupération d'un projet.
+        """
+        # Créer un projet
+        project = project_factory(is_draft=False, status="ACTIVE")
+        
+        # Récupérer le projet
+        url = reverse('project-detail', args=[project.id])
+        response = client.get(url)
+        
+        # Vérifier la réponse
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['id'] == str(project.id)
+        assert response.data['title'] == project.title
+        assert response.data['short_description'] == project.short_description
+        assert response.data['full_description'] == project.full_description
+    
+    def test_update_project(self, auth_client, project_factory):
+        """
+        Test de mise à jour d'un projet.
+        """
+        # Créer un projet
+        project = project_factory()
+        
+        # Données de mise à jour
+        update_data = {
+            'title': 'Titre mis à jour',
+            'short_description': 'Description courte mise à jour'
+        }
+        
+        # Mettre à jour le projet
+        url = reverse('project-detail', args=[project.id])
+        response = auth_client(project.creator).patch(url, update_data, format='json')
+        
+        # Vérifier la réponse
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['title'] == 'Titre mis à jour'
+        assert response.data['short_description'] == 'Description courte mise à jour'
+        
+        # Vérifier la base de données
+        project.refresh_from_db()
+        assert project.title == 'Titre mis à jour'
+        assert project.short_description == 'Description courte mise à jour'
+    
+    def test_delete_project(self, auth_client, project_factory):
+        """
+        Test de suppression d'un projet.
+        """
+        # Créer un projet
+        project = project_factory()
+        
+        # Supprimer le projet
+        url = reverse('project-detail', args=[project.id])
+        response = auth_client(project.creator).delete(url)
+        
+        # Vérifier la réponse
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        
+        # Vérifier que le projet a été supprimé
+        assert not Project.objects.filter(id=project.id).exists()
+    
+    def test_unauthorized_update(self, auth_client, user_factory, project_factory):
+        """
+        Test de mise à jour d'un projet par un utilisateur non autorisé.
+        """
+        # Créer un projet et un autre utilisateur
+        project = project_factory()
+        other_user = user_factory()
+        
+        # Essayer de mettre à jour le projet
+        url = reverse('project-detail', args=[project.id])
+        response = auth_client(other_user).patch(
+            url, 
+            {'title': 'Titre non autorisé'}, 
+            format='json'
+        )
+        
+        # Vérifier la réponse
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+8.3 Fixtures et factories
+Création de fixtures pour les tests:
+# apps/conftest.py
+import pytest
+import uuid
+import factory
+from django.contrib.auth import get_user_model
+from rest_framework.test import APIClient
+
+User = get_user_model()
+
+# Classes Factory
+
+class UserFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = User
+    
+    email = factory.Sequence(lambda n: f'user{n}@example.com')
+    username = factory.Sequence(lambda n: f'user{n}')
+    first_name = factory.Faker('first_name')
+    last_name = factory.Faker('last_name')
+    password = factory.PostGenerationMethodCall('set_password', 'password123')
+    is_active = True
+    is_verified = True
+
+class ProfileFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = 'users.UserProfile'
+    
+    user = factory.SubFactory(UserFactory)
+    bio_short = factory.Faker('paragraph', nb_sentences=2)
+    title = factory.Faker('job')
+
+class ProjectCategoryFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = 'projects.ProjectCategory'
+    
+    name = factory.Sequence(lambda n: f'Category {n}')
+    name_en = factory.SelfAttribute('name')
+    name_fr = factory.SelfAttribute('name')
+    description = factory.Faker('paragraph')
+    icon = 'category'
+    color = '#1877F2'
+
+class ProjectFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = 'projects.Project'
+    
+    creator = factory.SubFactory(UserFactory)
+    title = factory.Faker('sentence', nb_words=4)
+    short_description = factory.Faker('paragraph', nb_sentences=1)
+    full_description = factory.Faker('paragraph', nb_sentences=3)
+    category = factory.SubFactory(ProjectCategoryFactory)
+    stage = factory.Iterator(['IDEA', 'PROTOTYPE', 'DEVELOPMENT', 'GROWTH'])
+    funding_min = factory.Faker('random_int', min=10000, max=50000)
+    funding_max = factory.Faker('random_int', min=50001, max=100000)
+    funding_currency = 'EUR'
+    location_country = factory.Faker('country')
+    location_city = factory.Faker('city')
+    is_premium = False
+    is_featured = False
+    is_draft = False
+    status = 'ACTIVE'
+    views_count = 0
+    interests_count = 0
+    favorites_count = 0
+
+# Fixtures
+
+@pytest.fixture
+def user_factory():
+    return UserFactory
+
+@pytest.fixture
+def profile_factory():
+    return ProfileFactory
+
+@pytest.fixture
+def project_category_factory():
+    return ProjectCategoryFactory
+
+@pytest.fixture
+def project_factory():
+    return ProjectFactory
+
+@pytest.fixture
+def client():
+    return APIClient()
+
+@pytest.fixture
+def auth_client():
+    def _auth_client(user):
+        client = APIClient()
+        client.force_authenticate(user=user)
+        return client
+    return _auth_client
+9. Documentation
+9.1 Documentation API
+Configuration de Swagger/OpenAPI:
+# venture_link_project/settings/base.py
+INSTALLED_APPS = [
+    # ...
+    'drf_spectacular',
+    # ...
+]
+
+# Configuration Spectacular pour la documentation API
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'VentureLink API',
+    'DESCRIPTION': 'API pour la plateforme VentureLink de mise en relation entre porteurs de projets et investisseurs',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': r'/api/v[0-9]',
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_COERCE_PATH_PK_SUFFIX': True,
+    'SCHEMA_COERCE_METHOD_NAMES': {
+        'retrieve': 'get',
+        'destroy': 'delete',
+        'partial_update': 'patch',
+    },
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': False,
+    },
+}
+
+REST_FRAMEWORK = {
+    # ...
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # ...
+}
+9.2 Exemple de documentation pour un endpoint
+# apps/users/views/profile_views.py
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+
+@extend_schema(
+    tags=['Profiles'],
+    summary='Télécharger une photo de profil',
+    description='Permet à l\'utilisateur de télécharger une photo de profil.',
+    request={
+        'multipart/form-data': {
+            'type': 'object',
+            'properties': {
+                'file': {
+                    'type': 'string',
+                    'format': 'binary'
+                }
+            },
+            'required': ['file']
+        }
+    },
+    responses={
+        200: {
+            'description': 'Photo de profil téléchargée avec succès',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'profile_picture': {
+                                'type': 'string',
+                                'format': 'uri'
+                            }
+                        }
+                    },
+                    'examples': {
+                        'success': {
+                            'value': {
+                                'profile_picture': 'https://api.venturelink.com/media/profiles/ab12cd34/profile_picture.jpg'
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            'description': 'Requête invalide',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'error': {
+                                'type': 'string'
+                            }
+                        }
+                    },
+                    'examples': {
+                        'no_file': {
+                            'value': {
+                                'error': 'Aucun fichier fourni'
+                            }
+                        },
+                        'invalid_format': {
+                            'value': {
+                                'error': 'Format de fichier non supporté'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+@action(detail=False, methods=['post'], url_path='pictures/profile', parser_classes=[MultiPartParser])
+def upload_profile_picture(self, request):
+    """
+    Télécharge une photo de profil pour l'utilisateur.
+    """
+    file = request.FILES.get('file')
+    
+    if not file:
+        return Response(
+            {'error': 'Aucun fichier fourni'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    service = ProfileService()
+    profile_picture_url = service.update_profile_picture(request.user, file)
+    
+    return Response({'profile_picture': profile_picture_url})
+10. Déploiement
+10.1 Configuration Docker
+# Dockerfile
+FROM python:3.10-slim
+
+# Définir les variables d'environnement
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+ENV DJANGO_SETTINGS_MODULE venture_link_project.settings.production
+
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Installer les dépendances système
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        postgresql-client \
+        netcat-traditional \
+        gettext \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Installer les dépendances Python
+COPY requirements/production.txt .
+RUN pip install --no-cache-dir -r production.txt
+
+# Copier le code source
+COPY . .
+
+# Créer l'utilisateur non-root
+RUN useradd -m venturelink
+RUN chown -R venturelink:venturelink /app
+USER venturelink
+
+# Collecter les fichiers statiques
+RUN python manage.py collectstatic --noinput
+
+# Script d'entrée
+COPY scripts/entrypoint.sh .
+ENTRYPOINT ["./entrypoint.sh"]
+
+# Commande par défaut
+CMD ["gunicorn", "venture_link_project.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120"]
+# docker-compose.yml
+version: '3.8'
+
+services:
+  db:
+    image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - ./.env.prod
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_DB=${DB_NAME}
+    restart: unless-stopped
+    networks:
+      - venturelink-network
+  
+  redis:
+    image: redis:6-alpine
+    restart: unless-stopped
+    networks:
+      - venturelink-network
+  
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - media_volume:/app/media
+      - static_volume:/app/static
+    env_file:
+      - ./.env.prod
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    networks:
+      - venturelink-network
+  
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A venture_link_project worker -l INFO
+    env_file:
+      - ./.env.prod
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    networks:
+      - venturelink-network
+  
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A venture_link_project beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file:
+      - ./.env.prod
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    networks:
+      - venturelink-network
+  
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/conf.d/default.conf
+      - media_volume:/var/www/media
+      - static_volume:/var/www/static
+      - ./config/certbot/conf:/etc/letsencrypt
+      - ./config/certbot/www:/var/www/certbot
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks:
+      - venturelink-network
+
+volumes:
+  postgres_data:
+  media_volume:
+  static_volume:
+
+networks:
+  venturelink-network:
+    driver: bridge
+10.2 Configuration Nginx
+# config/nginx.conf
+upstream venturelink {
+    server web:8000;
+}
+
+server {
+    listen 80;
+    server_name api.venturelink.com;
+    
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name api.venturelink.com;
+    
+    ssl_certificate /etc/letsencrypt/live/api.venturelink.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.venturelink.com/privkey.pem;
+    
+    # Paramètres SSL recommandés
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+    
+    # HSTS
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    
+    # Autres en-têtes de sécurité
+    add_header X-Content-Type-Options nosniff;
+    add_header X-Frame-Options DENY;
+    add_header X-XSS-Protection "1; mode=block";
+    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; font-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline';";
+    
+    client_max_body_size 20M;
+    
+    location /static/ {
+        alias /var/www/static/;
+    }
+    
+    location /media/ {
+        alias /var/www/media/;
+    }
+    
+    location / {
+        proxy_pass http://venturelink;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+    }
+}
+10.3 Configuration CI/CD
+# .github/workflows/django-ci.yml
+name: Django CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: github_actions
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:6-alpine
+        ports:
+          - 6379:6379
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/test.txt
+    
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Test with pytest
+      env:
+        DJANGO_SETTINGS_MODULE: venture_link_project.settings.test
+        DATABASE_URL: postgres://postgres:postgres@localhost:5432/github_actions
+        REDIS_URL: redis://localhost:6379/0
+      run: |
+        pytest --cov=apps
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v1
+  
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_TOKEN }}
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+    
+    - name: Build and push
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: ${{ secrets.DOCKER_HUB_USERNAME }}/venturelink:${{ github.ref == 'refs/heads/main' && 'latest' || 'develop' }}
+  
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Deploy to Production
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USER }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          cd /opt/venturelink
+          docker-compose pull
+          docker-compose down
+          docker-compose up -d
+          docker system prune -af
+11. Monitoring et logs
+11.1 Configuration Sentry
+# venture_link_project/settings/production.py
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
+
+# Configuration Sentry
+sentry_sdk.init(
+    dsn=os.environ.get('SENTRY_DSN'),
+    integrations=[
+        DjangoIntegration(),
+        CeleryIntegration(),
+        RedisIntegration(),
+    ],
+    traces_sample_rate=0.5,
+    send_default_pii=False,
+    environment=os.environ.get('ENVIRONMENT', 'production'),
+)
+11.2 Configuration des logs
+# venture_link_project/settings/base.py
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+        'json': {
+            'format': '{"time": "%(asctime)s", "level": "%(levelname)s", "message": "%(message)s", "module": "%(module)s", "process": "%(process)d", "thread": "%(thread)d"}',
+            'datefmt': '%Y-%m-%dT%H:%M:%S%z',
+            'class': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+        },
+    },
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'json' if not DEBUG else 'verbose',
+        },
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'venturelink.log'),
+            'maxBytes': 1024 * 1024 * 5,  # 5 MB
+            'backupCount': 5,
+            'formatter': 'json' if not DEBUG else 'verbose',
+        },
+        'mail_admins': {
+            'level': 'ERROR',
+            'filters': ['require_debug_false'],
+            'class': 'django.utils.log.AdminEmailHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file', 'mail_admins'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'django.server': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['console', 'file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console', 'file', 'mail_admins'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'celery': {
+            'handlers': ['console', 'file', 'mail_admins'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+11.3 Surveillance des performances
+# apps/core/middleware.py
+import time
+import logging
+from django.db import connection
+from django.conf import settings
+
+logger = logging.getLogger('performance')
+
+class PerformanceMonitoringMiddleware:
+    """
+    Middleware pour surveiller les performances des requêtes.
+    """
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        # Marquer le début de la requête
+        start_time = time.time()
+        
+        # Nombre de requêtes DB au début
+        initial_queries = len(connection.queries)
+        
+        # Traiter la requête
+        response = self.get_response(request)
+        
+        # Calculer la durée totale
+        duration = time.time() - start_time
+        
+        # Calculer le nombre de requêtes DB
+        num_queries = len(connection.queries) - initial_queries
+        
+        # Consigner les performances si la durée dépasse un seuil
+        threshold = settings.PERFORMANCE_LOG_THRESHOLD
+        if duration > threshold:
+            path = request.path
+            method = request.method
+            
+            logger.warning(
+                f"Performance: {method} {path} took {duration:.2f}s with {num_queries} queries",
+                extra={
+                    'duration': duration,
+                    'num_queries': num_queries,
+                    'path': path,
+                    'method': method,
+                    'user_id': request.user.id if request.user.is_authenticated else None,
+                }
+            )
+        
+        # Ajouter des en-têtes de performance en mode DEBUG
+        if settings.DEBUG:
+            response['X-Performance-Time'] = f"{duration:.4f}s"
+            response['X-Performance-Queries'] = str(num_queries)
+        
+        return response
+12. Internationalisation
+12.1 Configuration de base
+# venture_link_project/settings/base.py
+USE_I18N = True
+USE_L10N = True
+LANGUAGE_CODE = 'fr'
+
+LANGUAGES = [
+    ('fr', 'Français'),
+    ('en', 'English'),
+]
+
+LOCALE_PATHS = [
+    os.path.join(BASE_DIR, 'locale'),
+]
+
+MIDDLEWARE = [
+    # ...
+    'django.middleware.locale.LocaleMiddleware',
+    # ...
+]
+12.2 Marquer les textes pour traduction
+# apps/projects/models/project.py
+from django.utils.translation import gettext_lazy as _
+
+class Project(TimeStampedModel, UUIDModel):
+    """
+    Modèle représentant un projet.
+    """
+    STAGE_CHOICES = (
+        ('IDEA', _('Idea')),
+        ('PROTOTYPE', _('Prototype')),
+        ('DEVELOPMENT', _('Development')),
+        ('GROWTH', _('Growth')),
+    )
+
+    STATUS_CHOICES = (
+        ('ACTIVE', _('Active')),
+        ('INACTIVE', _('Inactive')),
+        ('FUNDED', _('Funded')),
+        ('ARCHIVED', _('Archived')),
+    )
+
+    creator = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='created_projects',
+        verbose_name=_('Creator')
+    )
+    title = models.CharField(_('Title'), max_length=100)
+    short_description = models.TextField(_('Short description'), max_length=280)
+    # ...
+12.3 Configuration de la langue dans l'API
+# apps/core/middleware.py
+from django.utils import translation
+from django.utils.deprecation import MiddlewareMixin
+
+class ApiLanguageMiddleware(MiddlewareMixin):
+    """
+    Middleware pour définir la langue de l'API en fonction de l'en-tête Accept-Language.
+    """
+    
+    def process_request(self, request):
+        # Vérifier l'en-tête Accept-Language
+        accept_language = request.META.get('HTTP_ACCEPT_LANGUAGE', '')
+        
+        if accept_language:
+            # Analyser l'en-tête
+            languages = [lang.strip().split(';')[0] for lang in accept_language.split(',')]
+            
+            # Chercher la première langue supportée
+            for lang in languages:
+                if lang in ['fr', 'en']:
+                    translation.activate(lang)
+                    break
+        
+        # Si l'utilisateur est authentifié, utiliser sa préférence de langue
+        if request.user.is_authenticated and hasattr(request.user, 'language'):
+            translation.activate(request.user.language)
+        
+        # Définir la langue sur la réponse
+        request.LANGUAGE_CODE = translation.get_language()
+13. Sécurité supplémentaire
+13.1 Protection CSRF
+# apps/core/authentication.py
+from rest_framework.authentication import SessionAuthentication
+
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    """
+    Authentification par session sans vérification CSRF.
+    À utiliser uniquement pour les API avec authentification token-based.
+    """
+    
+    def enforce_csrf(self, request):
+        # Ne pas vérifier le CSRF
+        pass
+13.2 Protection contre les attaques par force brute
+# apps/users/views/auth_views.py
+from django.core.cache import cache
+from rest_framework.exceptions import Throttled
+
+class LoginAPIView(APIView):
+    """
+    API endpoint pour la connexion.
+    """
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            
+            # Vérifier les tentatives échouées
+            attempts_key = f"login_attempts:{email}"
+            attempts = cache.get(attempts_key, 0)
+            
+            # Bloquer après 5 tentatives échouées
+            if attempts >= 5:
+                # Définir le temps d'attente (30 minutes)
+                lockout_time = 30 * 60
+                
+                # Calculer le temps restant
+                ttl = cache.ttl(attempts_key)
+                if ttl > 0:
+                    raise Throttled(
+                        detail=f"Trop de tentatives de connexion échouées. Veuillez réessayer dans {ttl // 60} minutes.",
+                        wait=ttl
+                    )
+            
+            # Vérifier les identifiants
+            try:
+                user = authenticate_user(email, serializer.validated_data['password'])
+                
+                # Réinitialiser les tentatives en cas de succès
+                cache.delete(attempts_key)
+                
+                # Générer et retourner le token
+                token = generate_token(user)
+                return Response({'token': token})
+            except InvalidCredentialsException:
+                # Incrémenter le compteur d'échecs
+                cache.set(attempts_key, attempts + 1, timeout=30 * 60)
+                
+                return Response(
+                    {'error': 'Identifiants invalides'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+13.3 En-têtes de sécurité
+# apps/core/middleware.py
+class SecurityHeadersMiddleware:
+    """
+    Middleware pour ajouter des en-têtes de sécurité.
+    """
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        response = self.get_response(request)
+        
+        # En-têtes de sécurité
+        response['X-Content-Type-Options'] = 'nosniff'
+        response['X-Frame-Options'] = 'DENY'
+        response['X-XSS-Protection'] = '1; mode=block'
+        response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response['Permissions-Policy'] = 'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()'
+        
+        # En-tête Content-Security-Policy
+        if not settings.DEBUG:
+            csp_directives = [
+                "default-src 'self'",
+                "img-src 'self' data:",
+                "font-src 'self' data:",
+                "script-src 'self'",
+                "style-src 'self' 'unsafe-inline'",
+                "connect-src 'self'",
+                "frame-ancestors 'none'",
+                "form-action 'self'",
+                "base-uri 'self'",
+                "object-src 'none'"
+            ]
+            response['Content-Security-Policy'] = '; '.join(csp_directives)
+        
+        return response
+14. Bonnes pratiques et conventions
+14.1 Style de code
+Suivre PEP 8 et les conventions Django:
+# .flake8
+[flake8]
+max-line-length = 100
+exclude = .git,__pycache__,build,dist,venv,migrations
+ignore = E203,E501,W503
+14.2 Documentation dans le code
+# apps/projects/services/project_service.py
+def add_project_media(self, project, file, title=None, description=None, is_primary=False, order=0):
+    """
+    Ajoute un média à un projet.
+    
+    Args:
+        project (Project): Le projet auquel ajouter le média
+        file (File): Le fichier média à ajouter
+        title (str, optional): Titre du média
+        description (str, optional): Description du média
+        is_primary (bool, optional): Si ce média est l'image principale du projet
+        order (int, optional): Position d'affichage du média
+    
+    Returns:
+        ProjectMedia: L'objet média créé
+    
+    Raises:
+        LimitReachedException: Si la limite de médias est atteinte
+        ValidationError: Si le fichier n'est pas valide
+    """
+    # Implémentation
+14.3 Bonnes pratiques pour les tests
+# .coveragerc
+[run]
+source = apps
+omit = 
+    */migrations/*
+    */tests/*
+    */admin.py
+    */apps.py
+    */urls.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    def __str__
+    if self.debug:
+    raise NotImplementedError
+    pass
+    raise ImportError
+    if __name__ == .__main__.:
+15. Conclusion
+Cette architecture backend pour VentureLink fournit une base solide et évolutive pour l'application. Elle suit les meilleures pratiques de Django et REST Framework, avec une séparation claire des responsabilités entre les modèles, vues, sérialiseurs et services.
+L'architecture est conçue pour être:
+•	Robuste: avec une gestion des erreurs complète
+•	Sécurisée: avec différentes couches de protection
+•	Performante: grâce à l'optimisation des requêtes et la mise en cache
+•	Maintenable: grâce à l'organisation modulaire et la documentation
+•	Évolutive: permettant d'ajouter facilement de nouvelles fonctionnalités
+Les principales caractéristiques incluent:
+•	API RESTful avec documentation complète
+•	Authentification via Firebase avec JWT
+•	Gestion des médias et fichiers
+•	Système de notifications push
+•	Traitement asynchrone avec Celery
+•	Internationalisation complète
+•	Monitoring et logging détaillés
+•	Déploiement conteneurisé avec Docker
+Cela permet de fournir une base solide pour le MVP de VentureLink, tout en facilitant l'ajout de nouvelles fonctionnalités dans les versions futures.
+

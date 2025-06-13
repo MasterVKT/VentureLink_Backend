@@ -1,0 +1,18 @@
+# Importer les dépendances de base
+-r base.txt
+
+# Cache Redis
+django-redis==5.4.0
+
+# Serveur WSGI
+gunicorn==21.2.0
+
+# Surveillance et logging
+sentry-sdk==1.32.0
+
+# Performance
+Brotli==1.1.0
+whitenoise==6.5.0
+
+# Sécurité supplémentaire
+django-secure==1.0.2 

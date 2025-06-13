@@ -1,0 +1,62 @@
+{
+  "project_info": {
+    "project_number": "149697014585",
+    "project_id": "venturelink-5b045",
+    "storage_bucket": "venturelink-5b045.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:149697014585:android:0b01bf7eae8dca160716e8",
+        "android_client_info": {
+          "package_name": "com.xprience.venturelink"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "149697014585-3q3fga54rl0c09gib34ko9aet7a88amv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.xprience.venturelink",
+            "certificate_hash": "7457627233bd401c58c1e0add55a45302418715e"
+          }
+        },
+        {
+          "client_id": "149697014585-ngvamphsv61lp0gl6vstodp72fbpfn8h.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.xprience.venturelink",
+            "certificate_hash": "746c888ad30fea4ee39af69edf484003fd13cd56"
+          }
+        },
+        {
+          "client_id": "149697014585-3vq9q8k1ko4i5a0jp27h1ve6urtjd8ru.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5Ox6r37DWCZCKxmbziEKO6llVDZ4g_j0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "149697014585-3vq9q8k1ko4i5a0jp27h1ve6urtjd8ru.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "149697014585-rp1lrkbppbjmpesknpjkn6rm9686ee6r.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.xprience.venturelink"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

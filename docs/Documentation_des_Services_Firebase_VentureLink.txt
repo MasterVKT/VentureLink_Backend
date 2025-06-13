@@ -1,0 +1,685 @@
+Documentation des Services Firebase VentureLink
+Ce document détaille l'intégration des services Firebase dans l'application VentureLink, fournissant une référence commune pour les équipes frontend et backend afin d'assurer une intégration cohérente des fonctionnalités Firebase.
+1. Vue d'ensemble
+VentureLink utilise plusieurs services Firebase pour offrir des fonctionnalités essentielles:
+•	Firebase Authentication: Gestion de l'authentification utilisateur
+•	Firebase Cloud Messaging (FCM): Notifications push
+•	Firebase Analytics (recommandé): Suivi de l'engagement utilisateur
+•	Firebase Crashlytics (recommandé): Suivi des crashes
+2. Configuration partagée
+2.1 Identifiants de projet
+Environnement de développement:
+- Projet Firebase: venturelink-dev
+- ID de projet: venturelink-dev-12345
+- Région: europe-west1
+
+Environnement de production:
+- Projet Firebase: venturelink-prod
+- ID de projet: venturelink-prod-67890
+- Région: europe-west1
+2.2 Fichiers de configuration
+Frontend (Flutter)
+Le fichier google-services.json (Android) et GoogleService-Info.plist (iOS) doivent être placés dans les répertoires appropriés:
+•	Android: android/app/google-services.json
+•	iOS: ios/Runner/GoogleService-Info.plist
+Ces fichiers ne doivent pas être versionnés et doivent être distribués de manière sécurisée aux développeurs.
+Backend (Django)
+Le fichier firebase-admin-sdk.json pour l'accès au SDK Admin doit être placé dans:
+venture_link_project/config/firebase-admin-sdk.json
+Ce fichier ne doit pas être versionnés et doit être configuré comme variable d'environnement sur les serveurs.
+3. Firebase Authentication
+3.1 Méthodes d'authentification activées
+•	Authentification par email/mot de passe
+•	Google Sign-In
+•	Authentification OAuth LinkedIn (via solution personnalisée)
+3.2 Configuration Frontend
+Initialisation (Flutter)
+Future<void> initializeFirebase() async {
+  await Firebase.initializeApp();
+  
+  // Configuration supplémentaire pour Auth
+  FirebaseAuth.instance.setLanguageCode('fr');
+  
+  // Observer l'état d'authentification
+  FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    // Gérer le changement d'état
+  });
+}
+Authentification par Email/Mot de passe
+Future<UserCredential> registerWithEmailPassword(String email, String password) async {
+  try {
+    return await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+  } on FirebaseAuthException catch (e) {
+    // Gérer les erreurs spécifiques
+    if (e.code == 'email-already-in-use') {
+      throw AuthException('EMAIL_IN_USE');
+    } else if (e.code == 'weak-password') {
+      throw AuthException('WEAK_PASSWORD');
+    }
+    throw AuthException('REGISTRATION_FAILED');
+  }
+}
+
+Future<UserCredential> signInWithEmailPassword(String email, String password) async {
+  try {
+    return await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+  } on FirebaseAuthException catch (e) {
+    // Gérer les erreurs
+    if (e.code == 'user-not-found' || e.code == 'wrong-password') {
+      throw AuthException('INVALID_CREDENTIALS');
+    }
+    throw AuthException('LOGIN_FAILED');
+  }
+}
+Authentification Google
+Future<UserCredential> signInWithGoogle() async {
+  // Déclencher le flux d'authentification
+  final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+  
+  if (googleUser == null) throw AuthException('SIGN_IN_CANCELLED');
+  
+  // Obtenir les détails d'authentification
+  final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+  
+  // Créer un credential Firebase
+  final credential = GoogleAuthProvider.credential(
+    accessToken: googleAuth.accessToken,
+    idToken: googleAuth.idToken,
+  );
+  
+  // Se connecter à Firebase avec ce credential
+  return await FirebaseAuth.instance.signInWithCredential(credential);
+}
+Authentification LinkedIn
+Future<String> signInWithLinkedIn() async {
+  // Ouvrir la WebView pour le processus OAuth LinkedIn
+  final result = await FlutterWebAuth.authenticate(
+    url: 'https://api.venturelink.com/api/v1/auth/linkedin/authorize',
+    callbackUrlScheme: 'venturelink'
+  );
+  
+  // Extraire le token de l'URL de callback
+  final token = Uri.parse(result).queryParameters['token'];
+  
+  if (token == null) throw AuthException('LINKEDIN_AUTH_FAILED');
+  
+  return token;
+}
+Obtention du Token Firebase
+Future<String> getFirebaseToken() async {
+  final currentUser = FirebaseAuth.instance.currentUser;
+  if (currentUser == null) throw AuthException('NOT_AUTHENTICATED');
+  
+  return await currentUser.getIdToken();
+}
+3.3 Configuration Backend
+Initialisation (Django)
+import firebase_admin
+from firebase_admin import credentials, auth
+
+def initialize_firebase():
+    cred = credentials.Certificate("config/firebase-admin-sdk.json")
+    firebase_admin.initialize_app(cred)
+Vérification des tokens
+def verify_firebase_token(token):
+    try:
+        decoded_token = auth.verify_id_token(token)
+        return decoded_token
+    except auth.InvalidIdTokenError:
+        raise AuthenticationError("Invalid token")
+    except auth.ExpiredIdTokenError:
+        raise AuthenticationError("Token expired")
+    except Exception as e:
+        raise AuthenticationError(f"Authentication failed: {str(e)}")
+Middleware d'authentification
+class FirebaseAuthMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        authorization_header = request.headers.get('Authorization')
+        
+        if not authorization_header or not authorization_header.startswith('Bearer '):
+            return self.unauthorized_response()
+        
+        token = authorization_header.split('Bearer ')[1]
+        
+        try:
+            decoded_token = auth.verify_id_token(token)
+            request.firebase_user = decoded_token
+        except Exception:
+            return self.unauthorized_response()
+        
+        return self.get_response(request)
+    
+    def unauthorized_response(self):
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+Création d'utilisateurs
+def create_firebase_user(email, password, display_name=None):
+    try:
+        user = auth.create_user(
+            email=email,
+            password=password,
+            display_name=display_name,
+            email_verified=False
+        )
+        return user.uid
+    except auth.EmailAlreadyExistsError:
+        raise UserError("Email already exists")
+    except Exception as e:
+        raise UserError(f"Failed to create user: {str(e)}")
+4. Firebase Cloud Messaging (FCM)
+4.1 Structure des notifications
+Format standard des notifications
+{
+  "notification": {
+    "title": "Titre de la notification",
+    "body": "Corps de la notification"
+  },
+  "data": {
+    "type": "NEW_MESSAGE",
+    "entity_id": "uuid-123456",
+    "action": "OPEN_CONVERSATION",
+    "additional_data": "..."
+  },
+  "android": {
+    "priority": "high",
+    "notification": {
+      "channel_id": "messages"
+    }
+  },
+  "apns": {
+    "headers": {
+      "apns-priority": "10"
+    },
+    "payload": {
+      "aps": {
+        "sound": "default",
+        "badge": 1
+      }
+    }
+  }
+}
+Types de notifications et actions
+Type	Action	Description
+NEW_MESSAGE	OPEN_CONVERSATION	Ouvrir une conversation spécifique
+NEW_INTEREST	OPEN_PROJECT_INTEREST	Voir l'expression d'intérêt
+INTEREST_ACCEPTED	OPEN_CONVERSATION	Ouvrir la conversation créée
+PROJECT_QUESTION	OPEN_PROJECT_QUESTION	Voir la question posée
+QUESTION_ANSWERED	OPEN_PROJECT_QUESTION	Voir la réponse
+PROFILE_VIEW	OPEN_DASHBOARD	Ouvrir le tableau de bord
+SUBSCRIPTION_EXPIRING	OPEN_SUBSCRIPTION	Gérer l'abonnement
+4.2 Configuration Frontend
+Initialisation FCM
+Future<void> initializeFCM() async {
+  // Demander la permission
+  NotificationSettings settings = await FirebaseMessaging.instance.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+  
+  if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+    // S'abonner aux topics généraux
+    await FirebaseMessaging.instance.subscribeToTopic('announcements');
+    
+    // Configurer les gestionnaires
+    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+    
+    // Configurer les canaux Android
+    if (Platform.isAndroid) {
+      await _setupAndroidNotificationChannels();
+    }
+    
+    // Obtenir et enregistrer le token
+    String? token = await FirebaseMessaging.instance.getToken();
+    if (token != null) {
+      await _registerFCMToken(token);
+    }
+    
+    // Écouter les changements de token
+    FirebaseMessaging.instance.onTokenRefresh.listen(_registerFCMToken);
+  }
+}
+
+void _handleForegroundMessage(RemoteMessage message) {
+  // Traiter les notifications reçues lorsque l'app est au premier plan
+  if (message.notification != null) {
+    // Afficher une notification in-app
+  }
+  
+  // Traiter les données
+  if (message.data.isNotEmpty) {
+    _processNotificationData(message.data);
+  }
+}
+
+void _handleMessageOpenedApp(RemoteMessage message) {
+  // Traiter le clic sur une notification lorsque l'app était en arrière-plan
+  if (message.data.isNotEmpty) {
+    final type = message.data['type'];
+    final entityId = message.data['entity_id'];
+    final action = message.data['action'];
+    
+    // Router vers l'écran approprié selon l'action
+    _routeToScreen(action, entityId);
+  }
+}
+
+Future<void> _registerFCMToken(String token) async {
+  // Envoyer le token au backend
+  await apiService.updateFCMToken(token);
+}
+Configuration des canaux de notification Android
+Future<void> _setupAndroidNotificationChannels() async {
+  const AndroidNotificationChannel messagesChannel = AndroidNotificationChannel(
+    'messages',
+    'Messages',
+    description: 'Notifications pour les nouveaux messages',
+    importance: Importance.high,
+    enableVibration: true,
+  );
+  
+  const AndroidNotificationChannel interestsChannel = AndroidNotificationChannel(
+    'interests',
+    'Marques d\'intérêt',
+    description: 'Notifications pour les marques d\'intérêt sur les projets',
+    importance: Importance.high,
+  );
+  
+  const AndroidNotificationChannel questionsChannel = AndroidNotificationChannel(
+    'questions',
+    'Questions',
+    description: 'Notifications pour les questions sur les projets',
+    importance: Importance.default,
+  );
+  
+  const AndroidNotificationChannel generalChannel = AndroidNotificationChannel(
+    'general',
+    'Général',
+    description: 'Notifications générales et annonces',
+    importance: Importance.low,
+  );
+  
+  await FlutterLocalNotificationsPlugin().resolvePlatformSpecificImplementation<
+      AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannels([
+    messagesChannel,
+    interestsChannel,
+    questionsChannel,
+    generalChannel,
+  ]);
+}
+4.3 Configuration Backend
+Envoi de notifications
+from firebase_admin import messaging
+
+def send_fcm_notification(token, title, body, data=None):
+    """
+    Envoie une notification FCM à un token spécifique
+    """
+    message = messaging.Message(
+        notification=messaging.Notification(
+            title=title,
+            body=body
+        ),
+        data=data or {},
+        token=token,
+        android=messaging.AndroidConfig(
+            priority='high',
+            notification=messaging.AndroidNotification(
+                channel_id=_get_channel_id(data.get('type') if data else None)
+            )
+        ),
+        apns=messaging.APNSConfig(
+            headers={'apns-priority': '10'},
+            payload=messaging.APNSPayload(
+                aps=messaging.Aps(
+                    badge=1,
+                    sound='default'
+                )
+            )
+        )
+    )
+    
+    try:
+        response = messaging.send(message)
+        return response
+    except Exception as e:
+        logger.error(f"Failed to send FCM notification: {str(e)}")
+        raise NotificationError("Failed to send notification")
+
+def _get_channel_id(notification_type):
+    """
+    Détermine le canal de notification Android approprié
+    """
+    if notification_type in ['NEW_MESSAGE']:
+        return 'messages'
+    elif notification_type in ['NEW_INTEREST', 'INTEREST_ACCEPTED', 'INTEREST_REJECTED']:
+        return 'interests'
+    elif notification_type in ['PROJECT_QUESTION', 'QUESTION_ANSWERED']:
+        return 'questions'
+    else:
+        return 'general'
+
+def send_fcm_multicast(tokens, title, body, data=None):
+    """
+    Envoie une notification FCM à plusieurs tokens
+    """
+    message = messaging.MulticastMessage(
+        notification=messaging.Notification(
+            title=title,
+            body=body
+        ),
+        data=data or {},
+        tokens=tokens,
+        android=messaging.AndroidConfig(
+            priority='high',
+            notification=messaging.AndroidNotification(
+                channel_id=_get_channel_id(data.get('type') if data else None)
+            )
+        ),
+        apns=messaging.APNSConfig(
+            headers={'apns-priority': '10'},
+            payload=messaging.APNSPayload(
+                aps=messaging.Aps(
+                    badge=1,
+                    sound='default'
+                )
+            )
+        )
+    )
+    
+    try:
+        response = messaging.send_multicast(message)
+        return response
+    except Exception as e:
+        logger.error(f"Failed to send FCM multicast: {str(e)}")
+        raise NotificationError("Failed to send notification")
+
+def send_fcm_topic(topic, title, body, data=None):
+    """
+    Envoie une notification FCM à un topic
+    """
+    message = messaging.Message(
+        notification=messaging.Notification(
+            title=title,
+            body=body
+        ),
+        data=data or {},
+        topic=topic,
+        android=messaging.AndroidConfig(
+            priority='normal',
+            notification=messaging.AndroidNotification(
+                channel_id='general'
+            )
+        )
+    )
+    
+    try:
+        response = messaging.send(message)
+        return response
+    except Exception as e:
+        logger.error(f"Failed to send FCM topic message: {str(e)}")
+        raise NotificationError("Failed to send notification")
+Envoi de notifications basé sur les événements
+def notify_new_interest(interest):
+    """
+    Notifie un créateur de projet d'une nouvelle marque d'intérêt
+    """
+    # Récupérer le token FCM du créateur
+    creator = interest.project.creator
+    token = creator.fcm_token
+    
+    if not token:
+        logger.warning(f"User {creator.id} has no FCM token")
+        return
+    
+    # Créer les données de notification
+    title = "Nouvel intérêt pour votre projet"
+    body = f"{interest.user.first_name} {interest.user.last_name} est intéressé par votre projet {interest.project.title}"
+    data = {
+        "type": "NEW_INTEREST",
+        "entity_id": str(interest.id),
+        "action": "OPEN_PROJECT_INTEREST",
+        "project_id": str(interest.project.id),
+        "interest_id": str(interest.id)
+    }
+    
+    # Envoyer la notification
+    try:
+        send_fcm_notification(token, title, body, data)
+        
+        # Enregistrer la notification dans la base de données
+        Notification.objects.create(
+            recipient=creator,
+            sender=interest.user,
+            notification_type="NEW_INTEREST",
+            title=title,
+            message=body,
+            entity_type="PROJECT_INTEREST",
+            entity_id=interest.id,
+            action_url=f"/projects/{interest.project.id}/interests/{interest.id}",
+            delivered=True,
+            delivered_at=timezone.now()
+        )
+    except Exception as e:
+        logger.error(f"Failed to notify new interest: {str(e)}")
+        
+        # Enregistrer quand même la notification dans la base de données
+        Notification.objects.create(
+            recipient=creator,
+            sender=interest.user,
+            notification_type="NEW_INTEREST",
+            title=title,
+            message=body,
+            entity_type="PROJECT_INTEREST",
+            entity_id=interest.id,
+            action_url=f"/projects/{interest.project.id}/interests/{interest.id}",
+            delivered=False
+        )
+5. Firebase Analytics (recommandé)
+5.1 Événements à tracer
+Nom d'événement	Paramètres	Description
+login	method (string)	Connexion utilisateur
+sign_up	method (string)	Inscription utilisateur
+view_project	project_id (string), project_title (string), category (string)	Consultation d'un projet
+express_interest	project_id (string), project_title (string)	Expression d'intérêt
+message_sent	conversation_id (string), has_attachment (boolean)	Envoi de message
+search	query (string), category (string), filters (string)	Recherche effectuée
+view_user_profile	user_id (string)	Consultation d'un profil
+add_to_favorites	project_id (string), project_title (string)	Ajout aux favoris
+premium_view	screen (string)	Vue d'une page premium
+subscription_started	plan (string), amount (number), currency (string)	Début d'abonnement
+5.2 Configuration Frontend
+import 'package:firebase_analytics/firebase_analytics.dart';
+
+class AnalyticsService {
+  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
+  
+  // Événements de base
+  Future<void> logLogin(String method) async {
+    await _analytics.logLogin(loginMethod: method);
+  }
+  
+  Future<void> logSignUp(String method) async {
+    await _analytics.logSignUp(signUpMethod: method);
+  }
+  
+  // Événements personnalisés
+  Future<void> logViewProject(String projectId, String projectTitle, String category) async {
+    await _analytics.logEvent(
+      name: 'view_project',
+      parameters: {
+        'project_id': projectId,
+        'project_title': projectTitle,
+        'category': category,
+      },
+    );
+  }
+  
+  Future<void> logExpressInterest(String projectId, String projectTitle) async {
+    await _analytics.logEvent(
+      name: 'express_interest',
+      parameters: {
+        'project_id': projectId,
+        'project_title': projectTitle,
+      },
+    );
+  }
+  
+  Future<void> logMessageSent(String conversationId, bool hasAttachment) async {
+    await _analytics.logEvent(
+      name: 'message_sent',
+      parameters: {
+        'conversation_id': conversationId,
+        'has_attachment': hasAttachment,
+      },
+    );
+  }
+  
+  // Définir les propriétés utilisateur
+  Future<void> setUserProperties({
+    required String userId,
+    required String userType,
+    required bool isPremium,
+  }) async {
+    await _analytics.setUserId(id: userId);
+    await _analytics.setUserProperty(name: 'user_type', value: userType);
+    await _analytics.setUserProperty(name: 'is_premium', value: isPremium.toString());
+  }
+  
+  // Navigation entre écrans
+  Future<void> logScreenView({
+    required String screenName,
+    String? screenClass,
+  }) async {
+    await _analytics.logScreenView(
+      screenName: screenName,
+      screenClass: screenClass,
+    );
+  }
+}
+6. Firebase Crashlytics (recommandé)
+6.1 Configuration Frontend
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+
+void initializeCrashlytics() {
+  // Capture les erreurs Flutter non gérées
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
+  
+  // Capture les erreurs de zone non gérées
+  runZonedGuarded<Future<void>>(() async {
+    // Initialisation de l'application...
+  }, (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack);
+  });
+}
+
+// Définir les identifiants utilisateur pour Crashlytics
+void setUserIdentifiers(String userId, String email) {
+  FirebaseCrashlytics.instance.setUserIdentifier(userId);
+  
+  // Ajouter des clés personnalisées
+  FirebaseCrashlytics.instance.setCustomKey('email', email);
+}
+
+// Journaliser des informations contextuelles
+void logCrashInfo(String message) {
+  FirebaseCrashlytics.instance.log(message);
+}
+
+// Signaler une erreur non fatale
+void reportNonFatalError(dynamic exception, StackTrace stack, {Map<String, dynamic>? context}) {
+  if (context != null) {
+    for (var entry in context.entries) {
+      FirebaseCrashlytics.instance.setCustomKey(entry.key, entry.value.toString());
+    }
+  }
+  
+  FirebaseCrashlytics.instance.recordError(exception, stack, fatal: false);
+}
+7. Sécurité et bonnes pratiques
+7.1 Gestion des tokens JWT
+•	Les tokens JWT générés par Firebase Authentication ont une durée de validité de 1 heure
+•	Le refresh token a une durée de validité de 2 semaines
+•	Le frontend doit toujours vérifier si le token est expiré avant d'envoyer une requête
+•	En cas d'expiration, utiliser le refresh token pour obtenir un nouveau token
+7.2 Sécurisation des communications
+•	Toutes les communications avec Firebase doivent être effectuées via HTTPS
+•	Les clés API Firebase doivent être restreintes par origine dans la console Firebase
+•	Pour les applications Android, restreindre les clés par empreinte de l'application
+•	Pour les applications iOS, restreindre les clés par bundle ID
+7.3 Gestion des permissions Firebase
+•	Utiliser des règles de sécurité restrictives pour les services Firebase (si utilisés directement)
+•	Limiter les permissions du compte de service du SDK Admin au strict minimum
+7.4 Monitoring et débuggage
+•	Activer la journalisation avancée dans la console Firebase
+•	Configurer des alertes pour les événements critiques (échecs d'authentification multiples, etc.)
+•	Vérifier régulièrement les rapports d'utilisation pour détecter des anomalies
+8. Déploiement et environnements
+8.1 Environnements séparés
+•	Projet Firebase de développement: venturelink-dev
+•	Projet Firebase de production: venturelink-prod
+8.2 Configuration multi-environnement
+Flutter
+enum Environment {
+  dev,
+  prod,
+}
+
+class FirebaseConfig {
+  static late final Environment environment;
+  
+  static void initialize(Environment env) {
+    environment = env;
+  }
+  
+  static String get projectId {
+    switch (environment) {
+      case Environment.dev:
+        return 'venturelink-dev-12345';
+      case Environment.prod:
+        return 'venturelink-prod-67890';
+    }
+  }
+  
+  static Future<void> initializeFirebase() async {
+    // Initialiser Firebase avec la configuration appropriée
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    
+    // Configuration selon l'environnement
+    if (environment == Environment.dev) {
+      // Configuration spécifique au développement
+    } else {
+      // Configuration spécifique à la production
+    }
+  }
+}
+Django
+import os
+from firebase_admin import credentials, initialize_app
+
+def initialize_firebase():
+    env = os.environ.get('ENVIRONMENT', 'dev')
+    
+    if env == 'dev':
+        cred_path = os.environ.get('FIREBASE_CREDENTIALS', 'config/firebase-admin-sdk-dev.json')
+        project_id = 'venturelink-dev-12345'
+    else:
+        cred_path = os.environ.get('FIREBASE_CREDENTIALS', 'config/firebase-admin-sdk-prod.json')
+        project_id = 'venturelink-prod-67890'
+    
+    cred = credentials.Certificate(cred_path)
+    initialize_app(cred, {
+        'projectId': project_id,
+    })
+

@@ -1,0 +1,432 @@
+Conventions et Standards VentureLink
+Ce document définit les conventions et standards à respecter par les équipes frontend et backend pour assurer une intégration cohérente et une maintenance facilitée du projet VentureLink.
+1. Nommage des ressources
+1.1 API et endpoints
+•	URL de base: /api/v1/
+•	Format des routes: Utiliser des noms au pluriel en minuscules (users, projects, conversations)
+•	Paramètres de route: Utiliser le format kebab-case pour les paramètres multiples (user-ratings)
+•	Query params: Utiliser le snake_case (sort_by, order_direction)
+•	Identifiants dans les URLs: Toujours utiliser des UUID (/projects/{uuid})
+Exemples:
+•	✅ /api/v1/projects
+•	✅ /api/v1/projects/{id}/media
+•	✅ /api/v1/users/{id}/ratings
+•	❌ /api/v1/Project (majuscule à ne pas utiliser)
+•	❌ /api/v1/user-profile (singulier à ne pas utiliser)
+1.2 Modèles de données
+•	Modèles Django: PascalCase au singulier (User, Project, Conversation)
+•	Champs de modèles: snake_case (first_name, created_at)
+•	Relations: snake_case avec nom explicite (project_owner, recipient_user)
+•	Clés étrangères: <nom_du_modèle>_id en snake_case (user_id, project_id)
+1.3 Code frontend
+•	Classes et composants Flutter: PascalCase (ProjectCard, MessageList)
+•	Variables et fonctions: camelCase (getUserProfile(), projectsList)
+•	Constantes globales: UPPER_SNAKE_CASE (API_BASE_URL, DEFAULT_TIMEOUT)
+•	Fichiers: snake_case pour les fichiers simples (auth_service.dart, project_model.dart)
+•	Widgets: PascalCase (ProjectDetailScreen.dart, UserProfileWidget.dart)
+1.4 Ressources d'assets
+•	Images: snake_case avec préfixe descriptif (icon_home.png, img_profile_default.jpg)
+•	Polices: snake_case (sf_pro_text_regular.ttf, roboto_medium.ttf)
+•	Données JSON: snake_case (categories_list.json, countries_data.json)
+2. Versionnement de l'API
+2.1 Stratégie de versionnement
+•	Versionnement par URL: /api/v1/, /api/v2/, etc.
+•	Changements majeurs: Nouvelle version (v2, v3, etc.)
+•	Changements mineurs: Compatibles avec la version existante
+•	Correctifs: Déployés dans la version existante
+2.2 Documentation des changements
+•	Tous les changements d'API doivent être documentés dans un changelog
+•	Format du changelog: 
+•	## v1.2.0 (2025-02-15)### Ajouts- Endpoint `/projects/{id}/analytics` pour statistiques détaillées### Modifications- Ajout du champ `view_count` dans la réponse `/projects/{id}`### Corrections- Correction du tri par date dans `/conversations`
+2.3 Compatibilité descendante
+•	Maintenir la compatibilité pour au moins une version majeure antérieure
+•	Ne jamais supprimer un champ existant dans une version mineure
+•	Utiliser la dépreciation avant la suppression 
+•	{  "id": "uuid-123",  "name": "Nouveau nom",  "title": "Ancien nom (déprécié, utiliser 'name' à la place)"}
+3. Format des erreurs
+3.1 Structure standard
+{
+  "error": {
+    "status_code": 400,
+    "error_code": "VALIDATION_ERROR",
+    "message": "Les données fournies sont invalides.",
+    "details": [
+      {
+        "field": "email",
+        "message": "Adresse email déjà utilisée."
+      }
+    ]
+  }
+}
+3.2 Codes d'erreur normalisés
+Code d'erreur	Description
+AUTHENTICATION_FAILED	Échec d'authentification
+INVALID_CREDENTIALS	Identifiants invalides
+TOKEN_EXPIRED	Token expiré
+TOKEN_INVALID	Token invalide
+PERMISSION_DENIED	Permission refusée
+RESOURCE_NOT_FOUND	Ressource introuvable
+VALIDATION_ERROR	Erreur de validation
+RATE_LIMIT_EXCEEDED	Limite de taux dépassée
+SUBSCRIPTION_REQUIRED	Abonnement Premium requis
+LIMIT_REACHED	Limite atteinte (projets, messages, etc.)
+RESOURCE_CONFLICT	Conflit de ressource
+INTERNAL_SERVER_ERROR	Erreur interne du serveur
+3.3 Codes HTTP
+Code HTTP	Utilisation
+200 OK	Requête réussie
+201 Created	Ressource créée avec succès
+204 No Content	Succès sans contenu à retourner (suppression)
+400 Bad Request	Erreur de validation ou requête mal formée
+401 Unauthorized	Authentification requise
+403 Forbidden	Authentifié mais autorisation insuffisante
+404 Not Found	Ressource introuvable
+409 Conflict	Conflit avec l'état actuel de la ressource
+422 Unprocessable Entity	Données valides mais inutilisables
+429 Too Many Requests	Trop de requêtes (rate limiting)
+500 Internal Server Error	Erreur interne du serveur
+4. Sécurité
+4.1 Authentification
+•	Utiliser JWT (JSON Web Token) pour l'authentification
+•	Format du header d'autorisation: Authorization: Bearer <token>
+•	Durée de validité du token: 1 heure
+•	Durée de validité du refresh token: 2 semaines
+•	Toujours vérifier la validité du token côté serveur
+4.2 Protection CSRF
+•	Utiliser des tokens CSRF pour toutes les requêtes modifiant des données
+•	Le frontend doit inclure le token CSRF dans les headers 
+•	X-CSRFToken: <token>
+4.3 Sécurité des données sensibles
+•	Ne jamais renvoyer de mots de passe ou de tokens de sécurité
+•	Toujours hacher les mots de passe avec Argon2
+•	Chiffrer les données sensibles en base de données
+•	Ne pas stocker de données sensibles dans les logs
+4.4 Protection contre les attaques courantes
+•	Utiliser des paramètres préparés pour toutes les requêtes SQL
+•	Valider toutes les entrées utilisateur (frontend et backend)
+•	Implémenter des limiteurs de débit (rate limiting)
+•	Configurer les headers de sécurité: 
+•	Strict-Transport-Security: max-age=31536000; includeSubDomainsContent-Security-Policy: default-src 'self'X-Content-Type-Options: nosniffX-Frame-Options: DENYX-XSS-Protection: 1; mode=block
+5. Rate Limiting
+5.1 Limites par défaut
+Type d'endpoint	Limite
+Lecture (GET)	100 requêtes / minute
+Écriture (POST, PUT, DELETE)	30 requêtes / minute
+Authentification	10 requêtes / minute
+5.2 Headers de rate limiting
+Le serveur doit inclure les headers suivants pour informer le client:
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1614556800
+5.3 Réponse en cas de dépassement
+En cas de dépassement de limite, renvoyer un code 429 avec:
+{
+  "error": {
+    "status_code": 429,
+    "error_code": "RATE_LIMIT_EXCEEDED",
+    "message": "Trop de requêtes. Veuillez réessayer après 60 secondes.",
+    "retry_after": 60
+  }
+}
+6. Internationalisation
+6.1 Standards de langues
+•	Toutes les chaînes visibles par l'utilisateur doivent être internationalisées
+•	Format de localisation: fichiers ARB pour Flutter, fichiers JSON pour le backend
+•	Langues supportées: 
+o	Français (fr) - Langue par défaut
+o	Anglais (en)
+6.2 Format des dates et heures
+•	Stockage en UTC (ISO 8601): 2025-02-15T14:30:45Z
+•	Affichage selon les préférences locales de l'utilisateur: 
+o	FR: 15/02/2025 14:30
+o	EN: Feb 15, 2025 2:30 PM
+6.3 Format des nombres et devises
+•	Séparateur décimal: 
+o	FR: virgule (1,5)
+o	EN: point (1.5)
+•	Format monétaire: 
+o	FR: 1 234,56 €
+o	EN: €1,234.56
+7. Documentation
+7.1 Documentation d'API
+•	Format OpenAPI (Swagger) 3.0
+•	Documenter tous les endpoints, paramètres, et réponses
+•	Inclure des exemples de requêtes et réponses
+•	Documenter les codes d'erreur spécifiques
+7.2 Documentation du code
+Backend (Python)
+def create_project(user_id, project_data):
+    """
+    Crée un nouveau projet.
+    
+    Args:
+        user_id (UUID): ID de l'utilisateur créateur
+        project_data (dict): Données du projet à créer
+            - title (str): Titre du projet
+            - description (str): Description du projet
+            - ...
+            
+    Returns:
+        dict: Les données du projet créé
+        
+    Raises:
+        ValidationError: Si les données sont invalides
+        LimitReachedError: Si l'utilisateur a atteint sa limite de projets
+    """
+    # Implémentation
+Frontend (Dart)
+/// Crée un nouveau projet.
+/// 
+/// [projectData] doit contenir au minimum:
+/// - title: Titre du projet
+/// - description: Description du projet
+/// 
+/// Renvoie les données du projet créé.
+/// 
+/// Lance [ValidationException] si les données sont invalides
+/// Lance [LimitReachedException] si l'utilisateur a atteint sa limite de projets
+Future<Project> createProject(Map<String, dynamic> projectData) async {
+  // Implémentation
+}
+7.3 Documentation utilisateur
+•	Maintenir une documentation utilisateur à jour
+•	Format Markdown pour faciliter le versionnement
+•	Documenter toutes les fonctionnalités avec captures d'écran
+•	Inclure des guides pas-à-pas pour les processus complexes
+8. Tests
+8.1 Tests unitaires
+Backend
+•	Utiliser pytest pour les tests unitaires
+•	Couverture de code minimale: 80%
+•	Tester toutes les validations et cas d'erreur
+•	Utiliser des fixtures et des mocks pour isoler les tests
+Frontend
+•	Utiliser Flutter test framework
+•	Tester les widgets, services et models
+•	Utiliser des mocks pour les services d'API
+•	Tester les différents états d'UI (chargement, erreur, succès)
+8.2 Tests d'intégration
+•	Tester les flux complets (inscription, création de projet, etc.)
+•	Utiliser des environnements de test isolés
+•	Tester la communication entre frontend et backend
+•	Automatiser les tests d'intégration dans la CI/CD
+8.3 Tests de performance
+•	Tester les temps de réponse des endpoints critiques
+•	Benchmarker les requêtes communes
+•	Tester le comportement sous charge
+•	Monitorer la consommation de ressources
+9. CI/CD et environnements
+9.1 Environnements
+•	Développement: Pour les développeurs
+•	Test: Pour les tests automatisés
+•	Staging: Environnement de pré-production
+•	Production: Environnement live
+9.2 Pipeline CI/CD
+Backend
+# GitHub Actions exemple
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Lint
+        run: flake8 .
+      - name: Test
+        run: pytest
+  
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Deploy to production
+        # Étapes de déploiement
+Frontend
+# GitHub Actions exemple
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: subosito/flutter-action@v1
+        with:
+          flutter-version: '3.3.0'
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+  
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: subosito/flutter-action@v1
+        with:
+          flutter-version: '3.3.0'
+      - run: flutter build appbundle
+      - run: flutter build ios --release --no-codesign
+      # Étapes de publication sur les stores
+10. Procédures de revue de code
+10.1 Liste de contrôle pour les revues
+•	Le code suit-il les conventions de nommage?
+•	Les tests sont-ils complets et passent-ils?
+•	La documentation est-elle à jour?
+•	Y a-t-il des problèmes de sécurité potentiels?
+•	Les performances sont-elles acceptables?
+•	Le code est-il lisible et maintenable?
+10.2 Modèle de pull request
+## Description
+Brève description de ce que fait ce PR.
+
+## Contexte
+Lien vers le ticket/issue concerné.
+
+## Changements
+- Détail des changements effectués
+- ...
+
+## Tests
+- Tests ajoutés/modifiés
+- Comment tester manuellement
+
+## Captures d'écran (si applicable)
+[Insérer captures d'écran]
+
+## Liste de contrôle
+- [ ] Les tests unitaires passent
+- [ ] Le code respecte les standards de qualité
+- [ ] La documentation a été mise à jour
+10.3 Processus d'approbation
+•	Au moins 1 revue par un autre développeur requise
+•	Les commentaires doivent être résolus avant la fusion
+•	CI/CD doit passer avec succès
+•	Pour les changements majeurs, un membre senior doit approuver
+11. Monitoring et journalisation
+11.1 Journalisation (Logging)
+Backend (Python)
+import logging
+
+logger = logging.getLogger(__name__)
+
+def create_project(user_id, project_data):
+    logger.info(f"Création de projet demandée par l'utilisateur {user_id}")
+    try:
+        # Logique métier
+        logger.info(f"Projet créé avec succès: {project_id}")
+        return project
+    except ValidationError as e:
+        logger.warning(f"Erreur de validation lors de la création de projet: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Erreur inattendue lors de la création de projet: {e}", exc_info=True)
+        raise
+Frontend (Dart)
+class Logger {
+  static void info(String message) {
+    print('[INFO] ${DateTime.now()}: $message');
+    // En production, envoyer au backend ou à un service de logging
+  }
+  
+  static void warning(String message) {
+    print('[WARNING] ${DateTime.now()}: $message');
+  }
+  
+  static void error(String message, [dynamic exception, StackTrace? stackTrace]) {
+    print('[ERROR] ${DateTime.now()}: $message');
+    if (exception != null) {
+      print('Exception: $exception');
+      if (stackTrace != null) {
+        print('StackTrace: $stackTrace');
+      }
+    }
+    // En production, envoyer au backend ou à Crashlytics
+  }
+}
+
+// Utilisation
+try {
+  // Code
+} catch (e, stackTrace) {
+  Logger.error('Erreur lors de la création de projet', e, stackTrace);
+}
+11.2 Métriques à surveiller
+•	Temps de réponse des API
+•	Taux d'erreur
+•	Utilisation des ressources (CPU, mémoire, disque)
+•	Nombre d'utilisateurs actifs
+•	Taux de conversion (inscription -> création de projet -> expression d'intérêt)
+•	Utilisation des fonctionnalités Premium
+11.3 Alertes
+Configurer des alertes pour:
+•	Taux d'erreur > 1%
+•	Temps de réponse > 500ms
+•	Utilisation CPU > 80%
+•	Plus de 5 échecs d'authentification consécutifs pour un même utilisateur
+•	Chute soudaine du nombre d'utilisateurs actifs
+12. Accessibilité
+12.1 Standards
+•	Respecter les standards WCAG 2.1 niveau AA
+•	Assurer un contraste suffisant (ratio minimum 4.5:1)
+•	Rendre tous les éléments interactifs accessibles au clavier
+•	Fournir des textes alternatifs pour toutes les images
+•	Supporter la navigation au clavier
+12.2 Implémentation Flutter
+// Exemple de widget accessible
+Widget buildAccessibleButton() {
+  return Semantics(
+    label: 'Créer un nouveau projet',
+    hint: 'Double tap pour créer un nouveau projet',
+    child: ElevatedButton(
+      onPressed: () => createProject(),
+      child: Text('Créer un projet'),
+    ),
+  );
+}
+
+// Exemple d'image accessible
+Widget buildAccessibleImage() {
+  return Image.asset(
+    'assets/images/logo.png',
+    semanticLabel: 'Logo VentureLink',
+  );
+}
+13. Gestion des dépendances
+13.1 Backend (Python)
+•	Utiliser un fichier requirements.txt pour lister toutes les dépendances
+•	Spécifier les versions exactes (django==4.2.0)
+•	Séparer les dépendances de développement (requirements-dev.txt)
+•	Utiliser un environnement virtuel (venv)
+13.2 Frontend (Flutter)
+•	Maintenir à jour le fichier pubspec.yaml
+•	Spécifier des plages de versions compatibles (firebase_core: ^2.1.0)
+•	Documenter la raison d'inclusion de chaque package
+•	Éviter les dépendances abandonnées ou peu maintenues
+13.3 Mise à jour des dépendances
+•	Planifier des revues régulières des dépendances (trimestrielles)
+•	Tester les mises à jour dans un environnement de développement
+•	Documenter tout changement majeur nécessitant des modifications du code
+

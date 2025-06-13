@@ -1,0 +1,27 @@
+[Unit]
+Description=VentureLink Celery Service
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=venturelink
+Group=venturelink
+WorkingDirectory=/app
+Environment="DJANGO_SETTINGS_MODULE=venture_link_project.settings.production"
+Environment="PATH=/app/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/app/venv/bin/celery -A venture_link_project worker -l info --concurrency=4
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=on-failure
+RestartSec=5s
+SyslogIdentifier=venturelink-celery
+
+# Limites de ressources
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target 

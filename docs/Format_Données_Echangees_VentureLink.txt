@@ -1,0 +1,584 @@
+Format des Données Échangées VentureLink
+Ce document définit en détail le format et la structure des données échangées entre le frontend Flutter et le backend Django REST Framework. Il sert de référence commune pour garantir la cohérence des données manipulées par les deux composants.
+1. Formats Généraux
+1.1 Dates et Heures
+•	Format ISO 8601: YYYY-MM-DDTHH:MM:SSZ 
+o	Exemple: 2025-02-15T14:30:45Z
+•	Format de date simple: YYYY-MM-DD 
+o	Exemple: 2025-02-15
+•	Format mois-année: YYYY-MM 
+o	Exemple: 2025-02
+•	Fuseau horaire: Toutes les dates sont stockées en UTC sur le backend
+•	Affichage: Le frontend convertit les dates dans le fuseau horaire local de l'utilisateur
+1.2 Identifiants
+•	Format: UUID version 4 sous forme de chaîne de caractères
+•	Exemple: "550e8400-e29b-41d4-a716-446655440000"
+•	Utilisation: Tous les identifiants d'entités (utilisateurs, projets, messages, etc.)
+1.3 Nombres
+•	Montants monétaires: Nombres décimaux avec 2 chiffres après la virgule
+•	Pourcentages: Nombres décimaux entre 0 et 100, avec 2 chiffres après la virgule
+•	Évaluations/Notes: Nombres décimaux entre 1.00 et 5.00, avec 2 chiffres après la virgule
+1.4 Fichiers et Médias
+•	URLs: URLs complètes pour tous les fichiers, stockées sous forme de chaînes
+•	Exemple: "https://storage.venturelink.com/profiles/ab12cd34/profile_picture.jpg"
+•	Types MIME: Fournis pour tous les fichiers
+•	Tailles: En octets (integer)
+1.5 Localisation
+•	Pays: Nom complet du pays (ex: "France")
+•	Ville: Nom de la ville (ex: "Paris")
+•	Internationalisation: Toutes les données textuelles sont fournies dans la langue de l'utilisateur
+2. Structures de Données Principales
+2.1 Utilisateur (User)
+{
+  "id": "uuid-string",
+  "email": "user@example.com",
+  "first_name": "John",
+  "last_name": "Doe",
+  "user_type": "INVESTOR|PROJECT_OWNER|BOTH",
+  "phone_number": "+33612345678",
+  "location": "Paris, France",
+  "language": "fr",
+  "is_verified": true,
+  "is_premium": false,
+  "date_joined": "2025-01-15T10:30:00Z",
+  "fcm_token": "firebase-cloud-messaging-token-string"
+}
+2.2 Profil (Profile)
+{
+  "id": "uuid-string",
+  "user_id": "uuid-string",
+  "profile_picture": "https://storage.venturelink.com/profiles/ab12cd34/profile_picture.jpg",
+  "cover_picture": "https://storage.venturelink.com/profiles/ab12cd34/cover_picture.jpg",
+  "bio_short": "Entrepreneur passionné par les technologies durables.",
+  "title": "Co-fondateur & CEO",
+  "website": "https://example.com",
+  "social_linkedin": "https://linkedin.com/in/johndoe",
+  "social_twitter": "https://twitter.com/johndoe",
+  "social_facebook": "https://facebook.com/johndoe",
+  "domain_expertise": [
+    {
+      "id": "uuid-string",
+      "name": "Intelligence Artificielle",
+      "years_experience": 5,
+      "level": "EXPERT"
+    },
+    {
+      "id": "uuid-string",
+      "name": "Développement Web",
+      "years_experience": 10,
+      "level": "EXPERT"
+    }
+  ],
+  "project_interests": [
+    {
+      "id": "uuid-string",
+      "name": "Énergie Renouvelable",
+      "level": "HIGH"
+    },
+    {
+      "id": "uuid-string",
+      "name": "Santé Connectée",
+      "level": "MEDIUM"
+    }
+  ],
+  "avg_rating": 4.85,
+  "rating_count": 27,
+  "views_count": 342,
+  "verification_level": "VERIFIED",
+  "created_at": "2025-01-15T10:35:00Z",
+  "updated_at": "2025-02-10T14:20:00Z",
+  "badges": [
+    {
+      "id": "uuid-string",
+      "name": "Entrepreneur Certifié",
+      "description": "A vérifié son identité et ses références professionnelles",
+      "badge_type": "VERIFICATION",
+      "color": "#42B72A"
+    }
+  ]
+}
+2.3 Éducation (Education)
+{
+  "id": "uuid-string",
+  "profile_id": "uuid-string",
+  "institution": "École Polytechnique",
+  "degree": "Diplôme d'Ingénieur",
+  "field_of_study": "Informatique et Intelligence Artificielle",
+  "start_year": 2015,
+  "end_year": 2018,
+  "description": "Spécialisation en machine learning et traitement du langage naturel.",
+  "created_at": "2025-01-15T11:20:00Z",
+  "updated_at": "2025-01-15T11:20:00Z"
+}
+2.4 Expérience Professionnelle (Experience)
+{
+  "id": "uuid-string",
+  "profile_id": "uuid-string",
+  "company": "TechStartup SAS",
+  "title": "Co-fondateur & CTO",
+  "location": "Paris, France",
+  "current": true,
+  "start_date": "2020-03",
+  "end_date": null,
+  "description": "Direction technique d'une startup spécialisée dans les solutions de mobilité durable.",
+  "created_at": "2025-01-15T11:25:00Z",
+  "updated_at": "2025-01-15T11:25:00Z"
+}
+2.5 Abonnement (Subscription)
+{
+  "id": "uuid-string",
+  "user_id": "uuid-string",
+  "plan": "FREE|PREMIUM_MONTHLY|PREMIUM_YEARLY",
+  "status": "ACTIVE|CANCELLED|EXPIRED|TRIAL",
+  "start_date": "2025-02-01T00:00:00Z",
+  "end_date": "2025-03-01T00:00:00Z",
+  "auto_renew": true,
+  "payment_provider": "stripe",
+  "payment_id": "stripe-subscription-id",
+  "created_at": "2025-02-01T10:15:00Z",
+  "updated_at": "2025-02-01T10:15:00Z"
+}
+2.6 Projet (Project)
+{
+  "id": "uuid-string",
+  "creator_id": "uuid-string",
+  "title": "EcoMobility - Solution de Transport Urbain Durable",
+  "short_description": "Application de mobilité urbaine partagée avec véhicules électriques autonomes.",
+  "full_description": "EcoMobility est une solution intégrée pour les villes intelligentes qui combine une plateforme logicielle de gestion de flotte et des véhicules électriques autonomes de petite taille...",
+  "category_id": "uuid-string",
+  "category": {
+    "id": "uuid-string",
+    "name": "Transport & Mobilité",
+    "icon": "commute"
+  },
+  "stage": "PROTOTYPE",
+  "funding_min": 200000.00,
+  "funding_max": 500000.00,
+  "funding_currency": "EUR",
+  "location_country": "France",
+  "location_city": "Lyon",
+  "is_premium": true,
+  "is_featured": false,
+  "is_draft": false,
+  "status": "ACTIVE",
+  "views_count": 487,
+  "interests_count": 15,
+  "favorites_count": 32,
+  "created_at": "2025-01-20T09:45:00Z",
+  "updated_at": "2025-02-05T16:30:00Z",
+  "published_at": "2025-01-20T10:30:00Z",
+  "business_plan": "https://storage.venturelink.com/projects/ef56gh78/business_plan.pdf",
+  "video_url": "https://vimeo.com/123456789"
+}
+2.7 Média Projet (ProjectMedia)
+{
+  "id": "uuid-string",
+  "project_id": "uuid-string",
+  "file": "https://storage.venturelink.com/projects/ef56gh78/prototype.jpg",
+  "file_type": "IMAGE",
+  "title": "Prototype du véhicule EcoMobility",
+  "description": "Premier prototype fonctionnel présenté au salon de la mobilité 2024",
+  "is_primary": true,
+  "order": 1,
+  "created_at": "2025-01-20T10:00:00Z",
+  "updated_at": "2025-01-20T10:00:00Z"
+}
+2.8 Besoins du Projet (ProjectNeeds)
+{
+  "id": "uuid-string",
+  "project_id": "uuid-string",
+  "partner_types": ["INVESTOR", "ASSOCIATE"],
+  "investment_type": "EQUITY",
+  "equity_percentage": 15.00,
+  "investment_details": "Recherche d'un investisseur stratégique avec expérience dans la mobilité urbaine. L'investissement servira à finaliser le développement des prototypes et à démarrer la production à petite échelle.",
+  "timeline": "Investissement attendu pour Q2 2025, déploiement prévu Q4 2025",
+  "created_at": "2025-01-20T10:05:00Z",
+  "updated_at": "2025-01-20T10:05:00Z"
+}
+2.9 Compétences Recherchées (ProjectSkillsNeeded)
+{
+  "id": "uuid-string",
+  "project_needs_id": "uuid-string",
+  "skill_id": "uuid-string",
+  "skill": {
+    "id": "uuid-string",
+    "name": "Ingénierie Électrique"
+  },
+  "importance": "HIGH",
+  "created_at": "2025-01-20T10:10:00Z"
+}
+2.10 Intérêt pour un Projet (ProjectInterest)
+{
+  "id": "uuid-string",
+  "project_id": "uuid-string",
+  "user_id": "uuid-string",
+  "status": "PENDING|ACCEPTED|REJECTED|WITHDRAWN",
+  "message": "Très intéressé par votre projet EcoMobility. J'ai 15 ans d'expérience dans le secteur des transports et je cherche à investir dans des solutions durables.",
+  "investment_amount": 300000.00,
+  "created_at": "2025-02-01T14:20:00Z",
+  "updated_at": "2025-02-01T14:20:00Z",
+  "response_message": null,
+  "response_date": null
+}
+2.11 Question sur un Projet (ProjectQuestion)
+{
+  "id": "uuid-string",
+  "project_id": "uuid-string",
+  "user_id": "uuid-string",
+  "question": "Avez-vous déjà des partenariats avec des collectivités locales pour tester votre solution?",
+  "is_private": false,
+  "status": "PENDING|ANSWERED|REJECTED",
+  "created_at": "2025-02-02T11:30:00Z",
+  "updated_at": "2025-02-02T11:30:00Z"
+}
+2.12 Réponse à une Question (ProjectQuestionAnswer)
+{
+  "id": "uuid-string",
+  "question_id": "uuid-string",
+  "answer": "Oui, nous avons un partenariat avec la métropole de Lyon pour un déploiement test prévu au second semestre 2025. Nous sommes également en discussion avec deux autres villes françaises.",
+  "answered_by_id": "uuid-string",
+  "created_at": "2025-02-02T15:45:00Z",
+  "updated_at": "2025-02-02T15:45:00Z"
+}
+2.13 Conversation (Conversation)
+{
+  "id": "uuid-string",
+  "project_id": "uuid-string",
+  "project_interest_id": "uuid-string",
+  "status": "ACTIVE|ARCHIVED|DELETED",
+  "last_message_date": "2025-02-05T18:30:00Z",
+  "created_at": "2025-02-01T14:30:00Z",
+  "updated_at": "2025-02-05T18:30:00Z"
+}
+2.14 Participant à une Conversation (ConversationParticipant)
+{
+  "id": "uuid-string",
+  "conversation_id": "uuid-string",
+  "user_id": "uuid-string",
+  "unread_count": 2,
+  "last_read_date": "2025-02-05T17:00:00Z",
+  "is_muted": false,
+  "joined_at": "2025-02-01T14:30:00Z",
+  "left_at": null
+}
+2.15 Message (Message)
+{
+  "id": "uuid-string",
+  "conversation_id": "uuid-string",
+  "sender_id": "uuid-string",
+  "content": "Bonjour, je suis très intéressé par votre projet. Pourrions-nous organiser un appel pour en discuter davantage?",
+  "message_type": "TEXT|FILE|SYSTEM",
+  "created_at": "2025-02-05T18:30:00Z",
+  "updated_at": "2025-02-05T18:30:00Z",
+  "is_deleted": false,
+  "deleted_at": null
+}
+2.16 Pièce Jointe de Message (MessageAttachment)
+{
+  "id": "uuid-string",
+  "message_id": "uuid-string",
+  "file": "https://storage.venturelink.com/messages/ij90kl12/presentation.pdf",
+  "file_name": "presentation_ecotransport.pdf",
+  "file_size": 2485760,
+  "file_type": "application/pdf",
+  "created_at": "2025-02-05T18:30:00Z"
+}
+2.17 Notification (Notification)
+{
+  "id": "uuid-string",
+  "recipient_id": "uuid-string",
+  "sender_id": "uuid-string",
+  "notification_type": "NEW_INTEREST|NEW_MESSAGE|INTEREST_ACCEPTED|PROJECT_QUESTION|...",
+  "title": "Nouvel intérêt pour votre projet",
+  "message": "John Doe a exprimé son intérêt pour votre projet EcoMobility",
+  "is_read": false,
+  "read_at": null,
+  "entity_type": "PROJECT_INTEREST",
+  "entity_id": "uuid-string",
+  "action_url": "/projects/{project_id}/interests/{interest_id}",
+  "created_at": "2025-02-01T14:20:00Z",
+  "delivered": true,
+  "delivered_at": "2025-02-01T14:20:05Z"
+}
+2.18 Évaluation (UserRating)
+{
+  "id": "uuid-string",
+  "rated_user_id": "uuid-string",
+  "rater_id": "uuid-string",
+  "project_id": "uuid-string",
+  "conversation_id": "uuid-string",
+  "rating": 4.50,
+  "comment": "Excellent interlocuteur, communication claire et professionnelle. Prise de décision rapide.",
+  "is_anonymous": false,
+  "criteria_ratings": {
+    "communication": 5.00,
+    "reliability": 4.00,
+    "expertise": 4.50
+  },
+  "created_at": "2025-02-20T10:15:00Z",
+  "updated_at": "2025-02-20T10:15:00Z",
+  "is_verified": true
+}
+2.19 Recherche Sauvegardée (SavedSearch)
+{
+  "id": "uuid-string",
+  "user_id": "uuid-string",
+  "name": "Projets Tech à Paris",
+  "search_type": "PROJECT",
+  "filters": {
+    "category": "uuid-string",
+    "location_city": "Paris",
+    "funding_min": 100000.00,
+    "funding_max": 500000.00,
+    "stage": "PROTOTYPE"
+  },
+  "is_default": true,
+  "created_at": "2025-01-25T09:30:00Z",
+  "updated_at": "2025-01-25T09:30:00Z",
+  "last_used_at": "2025-02-15T16:45:00Z"
+}
+2.20 Métriques Utilisateur (UserMetrics)
+{
+  "id": "uuid-string",
+  "user_id": "uuid-string",
+  "profile_completeness": 85.00,
+  "projects_count": 2,
+  "active_projects_count": 1,
+  "total_profile_views": 342,
+  "total_project_views": 789,
+  "total_interests_received": 15,
+  "total_interests_sent": 8,
+  "total_conversations": 10,
+  "active_conversations": 4,
+  "response_rate": 92.50,
+  "response_time_avg": 180,
+  "last_activity": "2025-02-20T15:30:00Z",
+  "created_at": "2025-01-15T10:40:00Z",
+  "updated_at": "2025-02-20T15:30:00Z"
+}
+2.21 Métriques Projet (ProjectMetrics)
+{
+  "id": "uuid-string",
+  "project_id": "uuid-string",
+  "completeness": 95.00,
+  "views_7d": 87,
+  "views_30d": 487,
+  "interests_7d": 3,
+  "interests_30d": 15,
+  "favorites_7d": 5,
+  "favorites_30d": 32,
+  "questions_count": 12,
+  "conversion_rate": 3.08,
+  "avg_view_duration": 145,
+  "engagement_score": 7.60,
+  "created_at": "2025-01-20T10:30:00Z",
+  "updated_at": "2025-02-20T00:00:00Z"
+}
+3. Énumérations et Types Prédéfinis
+3.1 Types d'Utilisateurs (UserType)
+•	INVESTOR: Investisseur
+•	PROJECT_OWNER: Porteur de projet
+•	BOTH: Les deux
+3.2 Niveaux d'Expertise (ExpertiseLevel)
+•	BEGINNER: Débutant
+•	INTERMEDIATE: Intermédiaire
+•	EXPERT: Expert
+3.3 Niveaux d'Intérêt (InterestLevel)
+•	LOW: Faible
+•	MEDIUM: Moyen
+•	HIGH: Élevé
+3.4 Stades de Projet (ProjectStage)
+•	IDEA: Idée
+•	PROTOTYPE: Prototype
+•	DEVELOPMENT: En développement
+•	GROWTH: En phase de croissance
+3.5 Types de Partenaires (PartnerType)
+•	INVESTOR: Investisseur
+•	ASSOCIATE: Associé
+•	MENTOR: Mentor
+3.6 Types d'Investissement (InvestmentType)
+•	EQUITY: Prise de participation
+•	DEBT: Prêt/Dette
+•	GRANT: Subvention
+•	OTHER: Autre
+3.7 Niveaux d'Importance (ImportanceLevel)
+•	LOW: Faible
+•	MEDIUM: Moyen
+•	HIGH: Élevé
+•	CRITICAL: Critique
+3.8 Statuts d'Intérêt (InterestStatus)
+•	PENDING: En attente
+•	ACCEPTED: Accepté
+•	REJECTED: Refusé
+•	WITHDRAWN: Retiré
+3.9 Types de Message (MessageType)
+•	TEXT: Texte
+•	FILE: Fichier
+•	SYSTEM: Message système
+3.10 Types de Notification (NotificationType)
+•	NEW_INTEREST: Nouvel intérêt pour un projet
+•	INTEREST_ACCEPTED: Intérêt accepté
+•	INTEREST_REJECTED: Intérêt refusé
+•	NEW_MESSAGE: Nouveau message
+•	PROJECT_QUESTION: Nouvelle question sur un projet
+•	QUESTION_ANSWERED: Réponse à une question
+•	PROFILE_VIEW: Vue sur le profil
+•	PROJECT_VIEW: Vue sur le projet
+•	NEW_RATING: Nouvelle évaluation
+•	SUBSCRIPTION_EXPIRING: Abonnement sur le point d'expirer
+•	PREMIUM_FEATURE_UNLOCKED: Fonctionnalité premium débloquée
+3.11 Plans d'Abonnement (SubscriptionPlan)
+•	FREE: Gratuit
+•	PREMIUM_MONTHLY: Premium mensuel
+•	PREMIUM_YEARLY: Premium annuel
+3.12 Statuts d'Abonnement (SubscriptionStatus)
+•	ACTIVE: Actif
+•	CANCELLED: Annulé (mais toujours valide jusqu'à la fin de la période)
+•	EXPIRED: Expiré
+•	TRIAL: Période d'essai
+3.13 Types de Badge (BadgeType)
+•	VERIFICATION: Vérification
+•	ACHIEVEMENT: Réalisation
+•	SPECIAL: Spécial
+3.14 Niveaux de Vérification (VerificationLevel)
+•	BASIC: Basique (email vérifié)
+•	ADVANCED: Avancé (téléphone vérifié)
+•	VERIFIED: Vérifié (identité vérifiée)
+4. Validation des Données
+4.1 Règles Générales
+•	Tous les champs obligatoires doivent être présents et non nuls
+•	Les chaînes de caractères ont des longueurs minimales et maximales spécifiées
+•	Les adresses email doivent être valides et uniques
+•	Les formats de date doivent respecter les standards définis
+•	Les nombres doivent être dans les plages définies
+•	Les énumérations doivent contenir des valeurs valides
+4.2 Validations Spécifiques
+Utilisateur (User)
+•	email: Format email valide, unique
+•	password: Minimum 8 caractères, au moins 1 majuscule, 1 minuscule, 1 chiffre
+•	first_name/last_name: Entre 2 et 100 caractères
+•	phone_number: Format international (E.164)
+Projet (Project)
+•	title: Entre 10 et 100 caractères
+•	short_description: Entre 20 et 280 caractères
+•	full_description: Entre 100 et 2000 caractères (standard), 5000 (premium)
+•	funding_min: Positif, inférieur à funding_max
+•	funding_max: Positif, supérieur à funding_min
+Profil (Profile)
+•	bio_short: Maximum 160 caractères (standard), 500 (premium)
+•	website/social_linkedin/etc.: URLs valides
+Message (Message)
+•	content: Non vide, maximum 5000 caractères
+Évaluation (UserRating)
+•	rating: Entre 1.00 et 5.00
+•	comment: Maximum 1000 caractères
+4.3 Contraintes par Type d'Utilisateur
+Utilisateur Standard (FREE)
+•	Limite de 2 projets actifs simultanément
+•	Maximum 3 photos par projet
+•	Maximum 5 tags par projet
+•	Maximum 15 projets favoris
+•	Maximum 3 questions par projet
+•	Limite de 150 messages par mois
+•	Taille maximum de fichier: 5 Mo
+•	Limite de 3 fichiers partagés par jour
+•	1 seule recherche sauvegardée
+Utilisateur Premium (PREMIUM)
+•	Limite de 5 projets actifs simultanément
+•	Maximum 10 photos par projet
+•	Maximum 15 tags par projet
+•	Projets favoris illimités
+•	Questions illimitées
+•	Messages illimités
+•	Taille maximum de fichier: 50 Mo
+•	Fichiers partagés illimités
+•	Jusqu'à 10 recherches sauvegardées
+5. Internationalisation
+5.1 Langues Supportées
+•	Français (fr): Langue par défaut
+•	Anglais (en): Seconde langue
+5.2 Champs Multilingues
+Les données suivantes sont stockées dans les deux langues supportées:
+•	Noms des catégories (name_fr, name_en)
+•	Noms des domaines d'expertise (name_fr, name_en)
+•	Noms des tags (name_fr, name_en)
+•	Noms des badges (name_fr, name_en)
+•	Contenus des templates d'email et de notification (subject_fr/en, body_fr/en)
+5.3 Format des Réponses
+La langue de réponse est déterminée par le paramètre language dans le profil de l'utilisateur ou par l'en-tête Accept-Language de la requête HTTP. Par défaut, les réponses sont en français.
+6. Pagination
+6.1 Format de Pagination
+Pour les endpoints qui retournent des listes, le format suivant est utilisé:
+{
+  "total": 100,
+  "page": 1,
+  "limit": 20,
+  "data": [
+    { /* objet 1 */ },
+    { /* objet 2 */ },
+    /* ... */
+  ]
+}
+6.2 Paramètres de Pagination
+•	page: Numéro de page à récupérer (défaut: 1)
+•	limit: Nombre d'éléments par page (défaut: 20, max: 50/100 selon l'endpoint)
+6.3 Tri
+•	sort: Champ sur lequel effectuer le tri (ex: created_at, views_count)
+•	order: Ordre du tri (asc, desc)
+7. Filtrage et Recherche
+7.1 Paramètres de Filtrage Communs
+•	search: Terme de recherche général (recherche dans les titres, descriptions, etc.)
+•	category: ID de la catégorie
+•	location_country/location_city: Filtrage par localisation
+•	date_from/date_to: Filtrage par plage de dates (format YYYY-MM-DD)
+7.2 Filtres Spécifiques aux Projets
+•	stage: Stade du projet (IDEA, PROTOTYPE, DEVELOPMENT, GROWTH)
+•	funding_min/funding_max: Plage de financement recherché
+•	tags: IDs des tags (séparés par des virgules)
+•	skills_needed: IDs des compétences recherchées
+•	is_premium: Projets premium uniquement (true/false)
+7.3 Structure de Filtres pour Recherches Sauvegardées
+{
+  "search": "startup écologie",
+  "category": "uuid-string",
+  "location_country": "France",
+  "location_city": "Paris",
+  "stage": ["PROTOTYPE", "DEVELOPMENT"],
+  "funding_min": 100000,
+  "funding_max": 500000,
+  "tags": ["uuid-1", "uuid-2"],
+  "sort": "created_at",
+  "order": "desc"
+}
+8. Gestion des Erreurs
+8.1 Format d'Erreur Standard
+{
+  "error": {
+    "status_code": 400,
+    "error_code": "VALIDATION_ERROR",
+    "message": "Les données fournies sont invalides.",
+    "details": [
+      {
+        "field": "email",
+        "message": "Adresse email déjà utilisée."
+      },
+      {
+        "field": "password",
+        "message": "Le mot de passe doit contenir au moins 8 caractères."
+      }
+    ]
+  }
+}
+8.2 Codes d'Erreur Principaux
+•	AUTHENTICATION_FAILED: Échec d'authentification
+•	INVALID_CREDENTIALS: Identifiants invalides
+•	TOKEN_EXPIRED: Token expiré
+•	TOKEN_INVALID: Token invalide
+•	PERMISSION_DENIED: Permission refusée
+•	RESOURCE_NOT_FOUND: Ressource introuvable
+•	VALIDATION_ERROR: Erreur de validation
+•	RATE_LIMIT_EXCEEDED: Limite de taux dépassée
+•	SUBSCRIPTION_REQUIRED: Abonnement Premium requis
+•	LIMIT_REACHED: Limite atteinte (projets, messages, etc.)
+•	RESOURCE_CONFLICT: Conflit de ressource
+

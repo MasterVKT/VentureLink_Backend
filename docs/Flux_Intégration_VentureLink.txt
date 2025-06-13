@@ -1,0 +1,254 @@
+Flux d'Intégration VentureLink
+Ce document décrit en détail les flux d'intégration entre le frontend et le backend pour les fonctionnalités principales de VentureLink. Il sert de guide pour assurer que les équipes de développement frontend et backend implémentent correctement les interactions entre les deux composants.
+1. Flux d'Authentification
+1.1 Inscription par Email
+Frontend → Backend:
+1.	L'utilisateur remplit le formulaire d'inscription dans l'application Flutter
+2.	Le frontend valide les champs (format email, force du mot de passe, etc.)
+3.	Le frontend envoie une requête POST /auth/register avec les données
+4.	Le frontend affiche un indicateur de chargement
+Backend → Frontend:
+1.	Le backend valide les données
+2.	Le backend crée l'utilisateur et génère un token JWT
+3.	Le backend répond avec l'ID utilisateur et le token
+4.	Le frontend stocke le token dans le stockage sécurisé
+5.	Le frontend redirige vers l'écran d'onboarding
+1.2 Connexion via Google
+Frontend → Backend:
+1.	L'utilisateur clique sur "Connexion avec Google"
+2.	Le frontend utilise Firebase Authentication pour obtenir un ID token Google
+3.	Le frontend envoie une requête POST /auth/social avec provider="GOOGLE" et le token
+4.	Le frontend affiche un indicateur de chargement
+Backend → Frontend:
+1.	Le backend vérifie le token avec Firebase Admin SDK
+2.	Si l'utilisateur existe, le backend génère un token JWT
+3.	Si l'utilisateur n'existe pas, il est créé puis un token JWT est généré
+4.	Le backend répond avec les informations utilisateur et le token
+5.	Le frontend stocke le token et redirige vers l'écran d'accueil ou d'onboarding (si nouvel utilisateur)
+1.3 Connexion via LinkedIn
+Frontend → Backend:
+1.	L'utilisateur clique sur "Connexion avec LinkedIn"
+2.	Le frontend ouvre une WebView pour l'authentification OAuth LinkedIn
+3.	Après authentification, LinkedIn fournit un code d'autorisation
+4.	Le frontend échange ce code contre un token via POST /auth/social avec provider="LINKEDIN"
+5.	Le frontend affiche un indicateur de chargement
+Backend → Frontend:
+1.	Le backend échange le code contre un token d'accès LinkedIn
+2.	Le backend récupère les informations utilisateur depuis l'API LinkedIn
+3.	Le backend crée/récupère l'utilisateur et génère un token JWT
+4.	Le backend répond avec les informations utilisateur et le token
+5.	Le frontend stocke le token et redirige vers l'écran approprié
+1.4 Rafraîchissement du Token
+Frontend → Backend:
+1.	Avant d'envoyer une requête, le frontend vérifie si le token est expiré
+2.	Si expiré, le frontend envoie une requête POST /auth/refresh-token avec le refresh_token
+3.	Le backend valide le refresh_token et génère un nouveau token JWT
+4.	Le backend répond avec le nouveau token et refresh_token
+5.	Le frontend met à jour les tokens stockés et poursuit la requête initiale
+2. Flux de Profil Utilisateur
+2.1 Création/Édition de Profil
+Frontend → Backend:
+1.	L'utilisateur complète/modifie son profil dans l'application
+2.	Le frontend valide les données saisies
+3.	Le frontend envoie une requête PUT /profiles/me avec les données
+4.	Le backend met à jour le profil et répond avec les données actualisées
+5.	Le frontend affiche un message de succès
+2.2 Upload de Photo de Profil
+Frontend → Backend:
+1.	L'utilisateur sélectionne une image dans la galerie ou prend une photo
+2.	Le frontend redimensionne et compresse l'image (max 5MB)
+3.	Le frontend envoie l'image via POST /profiles/me/pictures/profile en multipart/form-data
+4.	Le backend traite l'image, génère différentes tailles et stocke les fichiers
+5.	Le backend répond avec l'URL de l'image
+6.	Le frontend met à jour l'interface avec la nouvelle image
+2.3 Ajout/Édition d'Expérience Professionnelle
+Frontend → Backend:
+1.	L'utilisateur saisit les informations d'expérience professionnelle
+2.	Le frontend valide les données (dates, champs requis)
+3.	Pour une nouvelle entrée: POST /profiles/me/experience
+4.	Pour modification: PUT /profiles/me/experience/{id}
+5.	Le backend valide et enregistre les données
+6.	Le frontend met à jour la liste des expériences
+3. Flux de Gestion de Projets
+3.1 Création d'un Projet
+Frontend → Backend:
+1.	L'utilisateur remplit le formulaire de création de projet (étape par étape)
+2.	Le frontend valide les champs à chaque étape
+3.	Le frontend envoie une requête POST /projects avec les données complètes
+4.	Le backend vérifie le quota de projets de l'utilisateur (2 standard, 5 premium)
+5.	Le backend crée le projet et répond avec les données du projet
+6.	Si projet en brouillon, il reste en mode édition
+7.	Si publication directe, une requête POST /projects/{id}/publish est envoyée
+3.2 Upload de Médias Projet
+Frontend → Backend:
+1.	L'utilisateur sélectionne des images/fichiers pour son projet
+2.	Le frontend vérifie le type et la taille des fichiers
+3.	Pour chaque fichier, le frontend envoie une requête POST /projects/{id}/media
+4.	Le backend vérifie la limite de médias selon le type d'utilisateur
+5.	Le backend stocke les fichiers et répond avec les URLs
+6.	Le frontend affiche les médias dans l'interface du projet
+3.3 Expression d'Intérêt pour un Projet
+Frontend → Backend:
+1.	L'utilisateur clique sur "Je suis intéressé" sur un projet
+2.	Le frontend affiche un formulaire demandant un message et des informations
+3.	Le frontend envoie une requête POST /projects/{id}/interest avec les données
+4.	Le backend crée l'enregistrement d'intérêt et envoie une notification au créateur
+5.	Le backend répond avec la confirmation
+6.	Le frontend affiche un message de succès et met à jour l'état du bouton
+3.4 Réponse à un Intérêt (Créateur du Projet)
+Frontend → Backend:
+1.	Le créateur du projet reçoit une notification d'intérêt
+2.	Le créateur consulte les détails de l'intérêt
+3.	Le créateur accepte/refuse via une requête backend spécifique
+4.	Si acceptation, une conversation est automatiquement créée
+5.	Le backend envoie une notification à l'utilisateur intéressé
+6.	Le frontend du créateur et de l'utilisateur intéressé sont mis à jour
+4. Flux de Messagerie
+4.1 Récupération des Conversations
+Frontend → Backend:
+1.	L'utilisateur accède à l'écran de messagerie
+2.	Le frontend envoie une requête GET /conversations
+3.	Le backend récupère les conversations actives avec le dernier message
+4.	Le frontend affiche la liste triée par date du dernier message
+5.	Le frontend met à jour les badges de notification
+4.2 Chargement d'une Conversation
+Frontend → Backend:
+1.	L'utilisateur sélectionne une conversation
+2.	Le frontend envoie une requête GET /conversations/{id}
+3.	Le backend renvoie les détails et les derniers messages
+4.	Le frontend affiche les messages avec statut de lecture
+5.	Le frontend envoie POST /conversations/{id}/read pour marquer comme lu
+6.	Pour charger l'historique, pagination avec before timestamp
+4.3 Envoi de Message
+Frontend → Backend:
+1.	L'utilisateur saisit un message et appuie sur Envoyer
+2.	Le frontend valide le message (non vide, limite de caractères)
+3.	Le frontend envoie POST /conversations/{id}/messages
+4.	Le backend vérifie la limite de messages (utilisateur standard)
+5.	Le backend enregistre le message et envoie une notification push
+6.	Le frontend affiche le message dans la conversation
+4.4 Envoi de Fichier
+Frontend → Backend:
+1.	L'utilisateur sélectionne un fichier à envoyer
+2.	Le frontend vérifie le type et la taille (5MB standard, 50MB premium)
+3.	Le frontend envoie POST /conversations/{id}/messages/attachment
+4.	Le backend vérifie les limites et stocke le fichier
+5.	Le backend répond avec les données du message incluant l'attachment
+6.	Le frontend affiche le fichier dans la conversation
+4.5 Appel Audio (Premium uniquement)
+Frontend → Backend:
+1.	L'utilisateur premium clique sur l'icône d'appel
+2.	Le frontend envoie POST /conversations/{id}/call
+3.	Le backend crée l'entrée d'appel et envoie une notification push
+4.	Le destinataire reçoit la notification avec possibilité d'accepter/refuser
+5.	Si accepté, établissement de la connexion audio via service tiers
+6.	À la fin, le backend met à jour la durée et le statut de l'appel
+5. Flux de Notifications
+5.1 Configuration FCM
+Frontend → Backend:
+1.	Au lancement de l'application, le frontend récupère le token FCM
+2.	Le frontend envoie PUT /users/me avec le fcm_token
+3.	Le backend associe ce token à l'utilisateur pour les notifications push
+5.2 Gestion des Notifications
+Frontend → Backend:
+1.	L'utilisateur accède à l'écran des notifications
+2.	Le frontend envoie GET /notifications
+3.	Le backend renvoie les notifications de l'utilisateur
+4.	Quand l'utilisateur ouvre une notification, le frontend envoie POST /notifications/{id}/read
+5.	Pour marquer toutes comme lues: POST /notifications/read-all
+5.3 Notification Push
+Backend → Frontend:
+1.	Un événement se produit (nouveau message, intérêt, etc.)
+2.	Le backend crée une notification en base de données
+3.	Le backend envoie une notification push via Firebase Cloud Messaging
+4.	Le frontend reçoit la notification et la traite (arrière-plan ou premier plan)
+5.	Si l'app est ouverte, mise à jour de l'interface en temps réel
+6.	Si l'app est fermée, notification système avec deep linking
+6. Flux d'Abonnement Premium
+6.1 Souscription à l'Abonnement Premium
+Frontend → Backend:
+1.	L'utilisateur sélectionne un plan premium (mensuel ou annuel)
+2.	Le frontend envoie POST /subscriptions/checkout avec le plan choisi
+3.	Le backend génère une URL de paiement et un ID de session
+4.	Le frontend ouvre une WebView avec l'URL de paiement
+5.	L'utilisateur complète le paiement sur la page du fournisseur
+6.	Le fournisseur notifie le backend via webhook
+7.	Le backend met à jour le statut d'abonnement de l'utilisateur
+8.	La WebView est redirigée vers une page de succès avec deep link
+9.	Le frontend détecte le deep link et met à jour l'interface
+6.2 Gestion de l'Abonnement
+Frontend → Backend:
+1.	L'utilisateur accède à son abonnement dans les paramètres
+2.	Le frontend envoie GET /subscriptions/me
+3.	Le backend renvoie les détails de l'abonnement actuel
+4.	L'utilisateur peut désactiver le renouvellement automatique via PUT /subscriptions/me/auto-renew
+5.	L'utilisateur peut annuler l'abonnement via POST /subscriptions/me/cancel
+6.	Le backend met à jour le statut mais maintient l'accès jusqu'à la fin de la période payée
+7. Flux de Recherche et Découverte
+7.1 Feed de Découverte
+Frontend → Backend:
+1.	L'utilisateur accède à l'écran de découverte
+2.	Le frontend envoie GET /projects avec paramètres de tri
+3.	Le backend récupère les projets selon les critères et la pagination
+4.	Pour les utilisateurs premium, l'algorithme de recommandation est utilisé
+5.	Le frontend affiche les projets dans un feed infini
+6.	Au scroll, le frontend charge les pages suivantes
+7.2 Recherche avec Filtres
+Frontend → Backend:
+1.	L'utilisateur configure des filtres de recherche
+2.	Le frontend envoie GET /projects avec les paramètres de filtre
+3.	Le backend filtre et renvoie les projets correspondants
+4.	Le frontend affiche les résultats
+5.	Si l'utilisateur sauvegarde la recherche: POST /saved-searches
+6.	Les utilisateurs premium peuvent avoir jusqu'à 10 recherches sauvegardées
+7.3 Gestion des Favoris
+Frontend → Backend:
+1.	L'utilisateur marque un projet comme favori
+2.	Le frontend envoie POST /projects/{id}/favorite
+3.	Le backend vérifie la limite de favoris (15 pour standard, illimité pour premium)
+4.	Le backend enregistre le favori et met à jour le compteur
+5.	Pour retirer des favoris: DELETE /projects/{id}/favorite
+8. Flux d'Évaluation et Réputation
+8.1 Évaluation d'un Utilisateur
+Frontend → Backend:
+1.	Après une interaction (projet, conversation), l'option d'évaluation est activée
+2.	L'utilisateur remplit le formulaire d'évaluation (note, commentaire, critères)
+3.	Le frontend envoie POST /users/{id}/ratings
+4.	Le backend vérifie si une interaction a eu lieu entre les utilisateurs
+5.	Le backend enregistre l'évaluation et met à jour la note moyenne
+6.	Le backend notifie l'utilisateur évalué
+8.2 Affichage des Évaluations
+Frontend → Backend:
+1.	Sur un profil, le frontend envoie GET /users/{id}/ratings
+2.	Le backend renvoie la liste des évaluations et les statistiques
+3.	Le frontend affiche la note moyenne, répartition et commentaires
+9. Flux d'Analytics (Premium)
+9.1 Tableau de Bord
+Frontend → Backend:
+1.	L'utilisateur accède à son tableau de bord
+2.	Le frontend envoie GET /dashboard
+3.	Le backend calcule et renvoie les métriques globales
+4.	Le frontend affiche les statistiques et graphiques
+9.2 Analytics de Projet (Premium)
+Frontend → Backend:
+1.	Le créateur premium accède aux statistiques d'un projet
+2.	Le frontend envoie GET /projects/{id}/analytics
+3.	Le backend calcule les métriques détaillées du projet
+4.	Le frontend affiche les graphiques et données d'engagement
+10. Gestion des Erreurs et cas limites
+10.1 Dépassement de Limites
+Scénario: Un utilisateur standard tente de créer un 3ème projet actif
+1.	Le frontend envoie POST /projects
+2.	Le backend détecte que la limite est atteinte (2 projets)
+3.	Le backend répond avec une erreur 403 et code LIMIT_REACHED
+4.	Le frontend affiche un message expliquant la limite et proposant l'upgrade Premium
+10.2 Token Expiré
+1.	Le frontend envoie une requête avec un token expiré
+2.	Le backend répond avec une erreur 401 et code TOKEN_EXPIRED
+3.	Le frontend tente un rafraîchissement via POST /auth/refresh-token
+4.	Si le rafraîchissement échoue, l'utilisateur est redirigé vers l'écran de connexion
+10.3 Accès à une Fonctionnalité Premium
+1.	Un utilisateur standard tente d'accéder à une fonctionnalité Premium
+2.	Le backend répond avec une erreur 403 et code SUBSCRIPTION_REQUIRED
+3.	Le frontend affiche une modal de promotion Premium
+

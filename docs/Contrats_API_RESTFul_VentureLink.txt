@@ -1,0 +1,1547 @@
+Contrats d'API RESTful VentureLink
+Vue d'ensemble
+Ce document définit le contrat d'API complet entre le frontend (Flutter) et le backend (Django/REST Framework) de l'application VentureLink. Il constitue la source unique de vérité pour la communication entre les deux parties et doit être strictement respecté.
+Base URL
+•	Développement: https://api-dev.venturelink.com/api/v1/
+•	Production: https://api.venturelink.com/api/v1/
+Format des données
+•	Toutes les requêtes et réponses utilisent le format JSON
+•	Timestamps au format ISO 8601: YYYY-MM-DDTHH:MM:SSZ
+•	Les identifiants sont des UUID v4 sous forme de chaînes de caractères
+Authentification
+Headers
+Authorization: Bearer {token}
+Endpoints d'authentification
+POST /auth/register
+Inscription d'un nouvel utilisateur.
+Request Body:
+{
+  "email": "string",
+  "password": "string",
+  "first_name": "string",
+  "last_name": "string",
+  "user_type": "INVESTOR|PROJECT_OWNER|BOTH",
+  "terms_accepted": true
+}
+Response (201 Created):
+{
+  "id": "uuid",
+  "email": "string",
+  "first_name": "string",
+  "last_name": "string",
+  "user_type": "INVESTOR|PROJECT_OWNER|BOTH",
+  "date_joined": "timestamp",
+  "token": "string",
+  "refresh_token": "string"
+}
+POST /auth/login
+Connexion d'un utilisateur existant.
+Request Body:
+{
+  "email": "string",
+  "password": "string"
+}
+Response (200 OK):
+{
+  "id": "uuid",
+  "email": "string",
+  "first_name": "string",
+  "last_name": "string",
+  "user_type": "INVESTOR|PROJECT_OWNER|BOTH",
+  "token": "string",
+  "refresh_token": "string"
+}
+POST /auth/social
+Authentification via Google ou LinkedIn.
+Request Body:
+{
+  "provider": "GOOGLE|LINKEDIN",
+  "token": "string"
+}
+Response (200 OK):
+{
+  "id": "uuid",
+  "email": "string",
+  "first_name": "string",
+  "last_name": "string",
+  "user_type": "INVESTOR|PROJECT_OWNER|BOTH",
+  "is_new_user": true|false,
+  "token": "string",
+  "refresh_token": "string"
+}
+POST /auth/refresh-token
+Rafraîchissement du token d'authentification.
+Request Body:
+{
+  "refresh_token": "string"
+}
+Response (200 OK):
+{
+  "token": "string",
+  "refresh_token": "string"
+}
+POST /auth/forgot-password
+Demande de réinitialisation du mot de passe.
+Request Body:
+{
+  "email": "string"
+}
+Response (200 OK):
+{
+  "message": "Si cette adresse email est associée à un compte, un email de réinitialisation a été envoyé."
+}
+POST /auth/reset-password
+Réinitialisation du mot de passe avec le token reçu par email.
+Request Body:
+{
+  "token": "string",
+  "password": "string"
+}
+Response (200 OK):
+{
+  "message": "Mot de passe réinitialisé avec succès."
+}
+POST /auth/logout
+Déconnexion (invalidation du token).
+Request Body: Aucun
+Response (200 OK):
+{
+  "message": "Déconnexion réussie."
+}
+Endpoints d'API principaux
+Profils utilisateurs
+GET /users/me
+Récupération du profil de l'utilisateur connecté.
+Response (200 OK):
+{
+  "id": "uuid",
+  "email": "string",
+  "first_name": "string",
+  "last_name": "string",
+  "user_type": "INVESTOR|PROJECT_OWNER|BOTH",
+  "phone_number": "string|null",
+  "location": "string|null",
+  "language": "fr|en",
+  "is_verified": true|false,
+  "is_premium": true|false,
+  "fcm_token": "string|null",
+  "profile": {
+    "id": "uuid",
+    "profile_picture": "url|null",
+    "cover_picture": "url|null",
+    "bio_short": "string|null",
+    "title": "string|null",
+    "website": "string|null",
+    "social_linkedin": "string|null",
+    "social_twitter": "string|null",
+    "social_facebook": "string|null",
+    "domain_expertise": [
+      {
+        "id": "uuid",
+        "name": "string",
+        "years_experience": integer|null,
+        "level": "BEGINNER|INTERMEDIATE|EXPERT"
+      }
+    ],
+    "project_interests": [
+      {
+        "id": "uuid",
+        "name": "string",
+        "level": "LOW|MEDIUM|HIGH"
+      }
+    ],
+    "avg_rating": float,
+    "rating_count": integer,
+    "views_count": integer,
+    "verification_level": "BASIC|ADVANCED|VERIFIED",
+    "created_at": "timestamp",
+    "updated_at": "timestamp",
+    "badges": [
+      {
+        "id": "uuid",
+        "name": "string",
+        "description": "string",
+        "badge_type": "VERIFICATION|ACHIEVEMENT|SPECIAL",
+        "color": "string"
+      }
+    ],
+    "education": [
+      {
+        "id": "uuid",
+        "institution": "string",
+        "degree": "string",
+        "field_of_study": "string|null",
+        "start_year": integer,
+        "end_year": integer|null,
+        "description": "string|null"
+      }
+    ],
+    "experience": [
+      {
+        "id": "uuid",
+        "company": "string",
+        "title": "string",
+        "location": "string|null",
+        "current": true|false,
+        "start_date": "string (YYYY-MM)",
+        "end_date": "string (YYYY-MM)|null",
+        "description": "string|null"
+      }
+    ]
+  },
+  "subscription": {
+    "plan": "FREE|PREMIUM_MONTHLY|PREMIUM_YEARLY",
+    "status": "ACTIVE|CANCELLED|EXPIRED|TRIAL",
+    "start_date": "timestamp",
+    "end_date": "timestamp",
+    "auto_renew": true|false
+  }
+}
+PUT /users/me
+Mise à jour du profil de l'utilisateur connecté.
+Request Body:
+{
+  "first_name": "string",
+  "last_name": "string",
+  "phone_number": "string|null",
+  "location": "string|null",
+  "language": "fr|en",
+  "fcm_token": "string|null"
+}
+Response (200 OK):
+{
+  "id": "uuid",
+  "email": "string",
+  "first_name": "string",
+  "last_name": "string",
+  "phone_number": "string|null",
+  "location": "string|null",
+  "language": "fr|en",
+  "fcm_token": "string|null",
+  "updated_at": "timestamp"
+}
+PUT /users/me/password
+Changement du mot de passe.
+Request Body:
+{
+  "current_password": "string",
+  "new_password": "string"
+}
+Response (200 OK):
+{
+  "message": "Mot de passe modifié avec succès."
+}
+GET /profiles/{id}
+Récupération du profil d'un utilisateur par son ID.
+Response (200 OK):
+{
+  "id": "uuid",
+  "user_id": "uuid",
+  "first_name": "string",
+  "last_name": "string",
+  "profile_picture": "url|null",
+  "cover_picture": "url|null",
+  "bio_short": "string|null",
+  "title": "string|null",
+  "website": "string|null",
+  "social_linkedin": "string|null",
+  "social_twitter": "string|null",
+  "social_facebook": "string|null",
+  "domain_expertise": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "years_experience": integer|null,
+      "level": "BEGINNER|INTERMEDIATE|EXPERT"
+    }
+  ],
+  "project_interests": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "level": "LOW|MEDIUM|HIGH"
+    }
+  ],
+  "avg_rating": float,
+  "rating_count": integer,
+  "views_count": integer,
+  "verification_level": "BASIC|ADVANCED|VERIFIED",
+  "created_at": "timestamp",
+  "badges": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "description": "string",
+      "badge_type": "VERIFICATION|ACHIEVEMENT|SPECIAL",
+      "color": "string"
+    }
+  ],
+  "education": [
+    {
+      "id": "uuid",
+      "institution": "string",
+      "degree": "string",
+      "field_of_study": "string|null",
+      "start_year": integer,
+      "end_year": integer|null,
+      "description": "string|null"
+    }
+  ],
+  "experience": [
+    {
+      "id": "uuid",
+      "company": "string",
+      "title": "string",
+      "location": "string|null",
+      "current": true|false,
+      "start_date": "string (YYYY-MM)",
+      "end_date": "string (YYYY-MM)|null",
+      "description": "string|null"
+    }
+  ],
+  "is_premium": true|false
+}
+PUT /profiles/me
+Mise à jour du profil détaillé de l'utilisateur connecté.
+Request Body:
+{
+  "bio_short": "string|null",
+  "title": "string|null",
+  "website": "string|null",
+  "social_linkedin": "string|null",
+  "social_twitter": "string|null",
+  "social_facebook": "string|null",
+  "domain_expertise": [
+    {
+      "id": "uuid",
+      "years_experience": integer|null,
+      "level": "BEGINNER|INTERMEDIATE|EXPERT"
+    }
+  ],
+  "project_interests": [
+    {
+      "id": "uuid",
+      "level": "LOW|MEDIUM|HIGH"
+    }
+  ]
+}
+Response (200 OK):
+{
+  "id": "uuid",
+  "bio_short": "string|null",
+  "title": "string|null",
+  "website": "string|null",
+  "social_linkedin": "string|null",
+  "social_twitter": "string|null",
+  "social_facebook": "string|null",
+  "domain_expertise": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "years_experience": integer|null,
+      "level": "BEGINNER|INTERMEDIATE|EXPERT"
+    }
+  ],
+  "project_interests": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "level": "LOW|MEDIUM|HIGH"
+    }
+  ],
+  "updated_at": "timestamp"
+}
+POST /profiles/me/pictures/profile
+Upload d'une image de profil.
+Request Body: Form data avec le champ file contenant l'image (max 5MB, formats: jpg, png)
+Response (200 OK):
+{
+  "profile_picture": "url"
+}
+POST /profiles/me/pictures/cover
+Upload d'une image de couverture.
+Request Body: Form data avec le champ file contenant l'image (max 10MB, formats: jpg, png)
+Response (200 OK):
+{
+  "cover_picture": "url"
+}
+POST /profiles/me/education
+Ajout d'une entrée d'éducation.
+Request Body:
+{
+  "institution": "string",
+  "degree": "string",
+  "field_of_study": "string|null",
+  "start_year": integer,
+  "end_year": integer|null,
+  "description": "string|null"
+}
+Response (201 Created):
+{
+  "id": "uuid",
+  "institution": "string",
+  "degree": "string",
+  "field_of_study": "string|null",
+  "start_year": integer,
+  "end_year": integer|null,
+  "description": "string|null",
+  "created_at": "timestamp"
+}
+PUT /profiles/me/education/{id}
+Mise à jour d'une entrée d'éducation.
+Request Body:
+{
+  "institution": "string",
+  "degree": "string",
+  "field_of_study": "string|null",
+  "start_year": integer,
+  "end_year": integer|null,
+  "description": "string|null"
+}
+Response (200 OK):
+{
+  "id": "uuid",
+  "institution": "string",
+  "degree": "string",
+  "field_of_study": "string|null",
+  "start_year": integer,
+  "end_year": integer|null,
+  "description": "string|null",
+  "updated_at": "timestamp"
+}
+DELETE /profiles/me/education/{id}
+Suppression d'une entrée d'éducation.
+Response (204 No Content)
+POST /profiles/me/experience
+Ajout d'une entrée d'expérience professionnelle.
+Request Body:
+{
+  "company": "string",
+  "title": "string",
+  "location": "string|null",
+  "current": true|false,
+  "start_date": "string (YYYY-MM)",
+  "end_date": "string (YYYY-MM)|null",
+  "description": "string|null"
+}
+Response (201 Created):
+{
+  "id": "uuid",
+  "company": "string",
+  "title": "string",
+  "location": "string|null",
+  "current": true|false,
+  "start_date": "string (YYYY-MM)",
+  "end_date": "string (YYYY-MM)|null",
+  "description": "string|null",
+  "created_at": "timestamp"
+}
+PUT /profiles/me/experience/{id}
+Mise à jour d'une entrée d'expérience professionnelle.
+Request Body:
+{
+  "company": "string",
+  "title": "string",
+  "location": "string|null",
+  "current": true|false,
+  "start_date": "string (YYYY-MM)",
+  "end_date": "string (YYYY-MM)|null",
+  "description": "string|null"
+}
+Response (200 OK):
+{
+  "id": "uuid",
+  "company": "string",
+  "title": "string",
+  "location": "string|null",
+  "current": true|false,
+  "start_date": "string (YYYY-MM)",
+  "end_date": "string (YYYY-MM)|null",
+  "description": "string|null",
+  "updated_at": "timestamp"
+}
+DELETE /profiles/me/experience/{id}
+Suppression d'une entrée d'expérience professionnelle.
+Response (204 No Content)
+Projets
+GET /projects
+Liste des projets avec filtres.
+Query Parameters:
+•	category (string, optional): ID de la catégorie
+•	stage (string, optional): Stade du projet (IDEA, PROTOTYPE, DEVELOPMENT, GROWTH)
+•	location_country (string, optional): Pays
+•	location_city (string, optional): Ville
+•	funding_min (number, optional): Montant minimum recherché
+•	funding_max (number, optional): Montant maximum recherché
+•	tags (string, optional): IDs des tags séparés par des virgules
+•	search (string, optional): Terme de recherche
+•	sort (string, optional): Critère de tri (created_at, views_count, interests_count)
+•	order (string, optional): Ordre (asc, desc)
+•	page (integer, optional): Numéro de page (défaut: 1)
+•	limit (integer, optional): Nombre d'éléments par page (défaut: 20, max: 50)
+Response (200 OK):
+{
+  "total": integer,
+  "page": integer,
+  "limit": integer,
+  "data": [
+    {
+      "id": "uuid",
+      "title": "string",
+      "short_description": "string",
+      "creator": {
+        "id": "uuid",
+        "first_name": "string",
+        "last_name": "string",
+        "profile_picture": "url|null",
+        "title": "string|null",
+        "is_premium": true|false
+      },
+      "category": {
+        "id": "uuid",
+        "name": "string",
+        "icon": "string|null"
+      },
+      "stage": "IDEA|PROTOTYPE|DEVELOPMENT|GROWTH",
+      "primary_image": "url|null",
+      "funding_min": number|null,
+      "funding_max": number|null,
+      "funding_currency": "string",
+      "location_country": "string|null",
+      "location_city": "string|null",
+      "views_count": integer,
+      "interests_count": integer,
+      "favorites_count": integer,
+      "tags": [
+        {
+          "id": "uuid",
+          "name": "string"
+        }
+      ],
+      "is_premium": true|false,
+      "is_featured": true|false,
+      "created_at": "timestamp",
+      "updated_at": "timestamp",
+      "published_at": "timestamp|null",
+      "is_favorite": true|false,
+      "has_expressed_interest": true|false
+    }
+  ]
+}
+GET /projects/{id}
+Détail d'un projet.
+Response (200 OK):
+{
+  "id": "uuid",
+  "title": "string",
+  "short_description": "string",
+  "full_description": "string",
+  "creator": {
+    "id": "uuid",
+    "first_name": "string",
+    "last_name": "string",
+    "profile_picture": "url|null",
+    "title": "string|null",
+    "avg_rating": float,
+    "rating_count": integer,
+    "is_premium": true|false
+  },
+  "category": {
+    "id": "uuid",
+    "name": "string",
+    "icon": "string|null"
+  },
+  "stage": "IDEA|PROTOTYPE|DEVELOPMENT|GROWTH",
+  "media": [
+    {
+      "id": "uuid",
+      "file": "url",
+      "file_type": "IMAGE|DOCUMENT|VIDEO",
+      "title": "string|null",
+      "description": "string|null",
+      "is_primary": true|false,
+      "order": integer
+    }
+  ],
+  "funding_min": number|null,
+  "funding_max": number|null,
+  "funding_currency": "string",
+  "location_country": "string|null",
+  "location_city": "string|null",
+  "views_count": integer,
+  "interests_count": integer,
+  "favorites_count": integer,
+  "tags": [
+    {
+      "id": "uuid",
+      "name": "string"
+    }
+  ],
+  "needs": {
+    "partner_types": ["INVESTOR", "ASSOCIATE", "MENTOR"],
+    "skills_needed": [
+      {
+        "id": "uuid",
+        "name": "string",
+        "importance": "LOW|MEDIUM|HIGH|CRITICAL"
+      }
+    ],
+    "investment_type": "EQUITY|DEBT|GRANT|OTHER|null",
+    "equity_percentage": float|null,
+    "investment_details": "string|null",
+    "timeline": "string|null"
+  },
+  "is_premium": true|false,
+  "is_featured": true|false,
+  "is_draft": true|false,
+  "status": "ACTIVE|INACTIVE|FUNDED|ARCHIVED",
+  "created_at": "timestamp",
+  "updated_at": "timestamp",
+  "published_at": "timestamp|null",
+  "business_plan": "url|null",
+  "video_url": "string|null",
+  "is_favorite": true|false,
+  "has_expressed_interest": true|false,
+  "questions": [
+    {
+      "id": "uuid",
+      "user": {
+        "id": "uuid",
+        "first_name": "string",
+        "last_name": "string",
+        "profile_picture": "url|null"
+      },
+      "question": "string",
+      "created_at": "timestamp",
+      "answer": {
+        "answer": "string",
+        "created_at": "timestamp"
+      }
+    }
+  ],
+  "similar_projects": [
+    {
+      "id": "uuid",
+      "title": "string",
+      "short_description": "string",
+      "primary_image": "url|null",
+      "category": {
+        "id": "uuid",
+        "name": "string"
+      },
+      "is_premium": true|false
+    }
+  ]
+}
+POST /projects
+Création d'un projet.
+Request Body:
+{
+  "title": "string",
+  "short_description": "string",
+  "full_description": "string",
+  "category": "uuid",
+  "stage": "IDEA|PROTOTYPE|DEVELOPMENT|GROWTH",
+  "funding_min": number|null,
+  "funding_max": number|null,
+  "funding_currency": "string",
+  "location_country": "string|null",
+  "location_city": "string|null",
+  "tags": ["uuid"],
+  "needs": {
+    "partner_types": ["INVESTOR", "ASSOCIATE", "MENTOR"],
+    "skills_needed": [
+      {
+        "id": "uuid",
+        "importance": "LOW|MEDIUM|HIGH|CRITICAL"
+      }
+    ],
+    "investment_type": "EQUITY|DEBT|GRANT|OTHER|null",
+    "equity_percentage": float|null,
+    "investment_details": "string|null",
+    "timeline": "string|null"
+  },
+  "is_draft": true|false,
+  "video_url": "string|null"
+}
+Response (201 Created):
+{
+  "id": "uuid",
+  "title": "string",
+  "short_description": "string",
+  "full_description": "string",
+  "category": {
+    "id": "uuid",
+    "name": "string"
+  },
+  "stage": "IDEA|PROTOTYPE|DEVELOPMENT|GROWTH",
+  "funding_min": number|null,
+  "funding_max": number|null,
+  "funding_currency": "string",
+  "location_country": "string|null",
+  "location_city": "string|null",
+  "tags": [
+    {
+      "id": "uuid",
+      "name": "string"
+    }
+  ],
+  "needs": {
+    "partner_types": ["INVESTOR", "ASSOCIATE", "MENTOR"],
+    "skills_needed": [
+      {
+        "id": "uuid",
+        "name": "string",
+        "importance": "LOW|MEDIUM|HIGH|CRITICAL"
+      }
+    ],
+    "investment_type": "EQUITY|DEBT|GRANT|OTHER|null",
+    "equity_percentage": float|null,
+    "investment_details": "string|null",
+    "timeline": "string|null"
+  },
+  "is_draft": true|false,
+  "created_at": "timestamp",
+  "video_url": "string|null"
+}
+PUT /projects/{id}
+Mise à jour d'un projet.
+Request Body: (identique à POST /projects)
+Response (200 OK): (identique à POST /projects avec updated_at)
+DELETE /projects/{id}
+Suppression d'un projet.
+Response (204 No Content)
+POST /projects/{id}/publish
+Publication d'un projet en brouillon.
+Response (200 OK):
+{
+  "id": "uuid",
+  "is_draft": false,
+  "status": "ACTIVE",
+  "published_at": "timestamp"
+}
+POST /projects/{id}/media
+Ajout d'un média au projet.
+Request Body: Form data avec:
+•	file: fichier média (max 10MB, formats: jpg, png, pdf, mp4)
+•	title (optional): titre du média
+•	description (optional): description du média
+•	is_primary (optional): true/false
+•	order (optional): position d'affichage
+Response (201 Created):
+{
+  "id": "uuid",
+  "file": "url",
+  "file_type": "IMAGE|DOCUMENT|VIDEO",
+  "title": "string|null",
+  "description": "string|null",
+  "is_primary": true|false,
+  "order": integer,
+  "created_at": "timestamp"
+}
+PUT /projects/{project_id}/media/{media_id}
+Mise à jour d'un média.
+Request Body:
+{
+  "title": "string|null",
+  "description": "string|null",
+  "is_primary": true|false,
+  "order": integer
+}
+Response (200 OK):
+{
+  "id": "uuid",
+  "file": "url",
+  "file_type": "IMAGE|DOCUMENT|VIDEO",
+  "title": "string|null",
+  "description": "string|null",
+  "is_primary": true|false,
+  "order": integer,
+  "updated_at": "timestamp"
+}
+DELETE /projects/{project_id}/media/{media_id}
+Suppression d'un média.
+Response (204 No Content)
+POST /projects/{id}/business-plan
+Upload d'un business plan (Premium uniquement).
+Request Body: Form data avec le champ file contenant le document (max 10MB, format: pdf)
+Response (200 OK):
+{
+  "business_plan": "url"
+}
+POST /projects/{id}/interest
+Expression d'intérêt pour un projet.
+Request Body:
+{
+  "message": "string",
+  "investment_amount": number|null,
+  "skills_offered": ["uuid"]
+}
+Response (201 Created):
+{
+  "id": "uuid",
+  "project_id": "uuid",
+  "status": "PENDING",
+  "message": "string",
+  "investment_amount": number|null,
+  "skills_offered": [
+    {
+      "id": "uuid",
+      "name": "string"
+    }
+  ],
+  "created_at": "timestamp"
+}
+POST /projects/{id}/favorite
+Ajouter un projet aux favoris.
+Request Body:
+{
+  "notes": "string|null"
+}
+Response (201 Created):
+{
+  "id": "uuid",
+  "project_id": "uuid",
+  "notes": "string|null",
+  "created_at": "timestamp"
+}
+DELETE /projects/{id}/favorite
+Retirer un projet des favoris.
+Response (204 No Content)
+POST /projects/{id}/questions
+Poser une question sur un projet.
+Request Body:
+{
+  "question": "string",
+  "is_private": true|false
+}
+Response (201 Created):
+{
+  "id": "uuid",
+  "question": "string",
+  "is_private": true|false,
+  "status": "PENDING",
+  "created_at": "timestamp"
+}
+POST /projects/questions/{id}/answer
+Répondre à une question (créateur du projet uniquement).
+Request Body:
+{
+  "answer": "string"
+}
+Response (201 Created):
+{
+  "id": "uuid",
+  "question_id": "uuid",
+  "answer": "string",
+  "created_at": "timestamp"
+}
+Messagerie
+GET /conversations
+Liste des conversations de l'utilisateur.
+Query Parameters:
+•	page (integer, optional): Numéro de page (défaut: 1)
+•	limit (integer, optional): Nombre d'éléments par page (défaut: 20, max: 50)
+Response (200 OK):
+{
+  "total": integer,
+  "page": integer,
+  "limit": integer,
+  "data": [
+    {
+      "id": "uuid",
+      "participants": [
+        {
+          "id": "uuid",
+          "first_name": "string",
+          "last_name": "string",
+          "profile_picture": "url|null"
+        }
+      ],
+      "project": {
+        "id": "uuid",
+        "title": "string"
+      }|null,
+      "last_message": {
+        "sender_id": "uuid",
+        "content": "string",
+        "created_at": "timestamp"
+      }|null,
+      "unread_count": integer,
+      "status": "ACTIVE|ARCHIVED|DELETED",
+      "created_at": "timestamp",
+      "updated_at": "timestamp"
+    }
+  ]
+}
+GET /conversations/{id}
+Détail d'une conversation avec messages.
+Query Parameters:
+•	page (integer, optional): Numéro de page (défaut: 1)
+•	limit (integer, optional): Nombre d'éléments par page (défaut: 20, max: 50)
+•	before (timestamp, optional): Récupérer les messages avant cette date
+Response (200 OK):
+{
+  "id": "uuid",
+  "participants": [
+    {
+      "id": "uuid",
+      "first_name": "string",
+      "last_name": "string",
+      "profile_picture": "url|null",
+      "title": "string|null"
+    }
+  ],
+  "project": {
+    "id": "uuid",
+    "title": "string",
+    "primary_image": "url|null"
+  }|null,
+  "project_interest": {
+    "id": "uuid",
+    "status": "PENDING|ACCEPTED|REJECTED|WITHDRAWN"
+  }|null,
+  "status": "ACTIVE|ARCHIVED|DELETED",
+  "created_at": "timestamp",
+  "messages": {
+    "total": integer,
+    "page": integer,
+    "limit": integer,
+    "data": [
+      {
+        "id": "uuid",
+        "sender": {
+          "id": "uuid",
+          "first_name": "string",
+          "last_name": "string"
+        },
+        "content": "string",
+        "message_type": "TEXT|FILE|SYSTEM",
+        "attachments": [
+          {
+            "id": "uuid",
+            "file": "url",
+            "file_name": "string",
+            "file_size": integer,
+            "file_type": "string"
+          }
+        ]|null,
+        "read_by": ["uuid"],
+        "created_at": "timestamp",
+        "updated_at": "timestamp"
+      }
+    ]
+  }
+}
+POST /conversations/{id}/messages
+Envoi d'un message dans une conversation.
+Request Body:
+{
+  "content": "string"
+}
+Response (201 Created):
+{
+  "id": "uuid",
+  "sender": {
+    "id": "uuid",
+    "first_name": "string",
+    "last_name": "string"
+  },
+  "content": "string",
+  "message_type": "TEXT",
+  "read_by": [],
+  "created_at": "timestamp"
+}
+POST /conversations/{id}/messages/attachment
+Envoi d'un fichier dans une conversation.
+Request Body: Form data avec le champ file contenant le fichier (max 5MB standard, 50MB premium)
+Response (201 Created):
+{
+  "id": "uuid",
+  "sender": {
+    "id": "uuid",
+    "first_name": "string",
+    "last_name": "string"
+  },
+  "content": "",
+  "message_type": "FILE",
+  "attachments": [
+    {
+      "id": "uuid",
+      "file": "url",
+      "file_name": "string",
+      "file_size": integer,
+      "file_type": "string"
+    }
+  ],
+  "read_by": [],
+  "created_at": "timestamp"
+}
+POST /conversations/{id}/read
+Marquer tous les messages d'une conversation comme lus.
+Response (200 OK):
+{
+  "unread_count": 0
+}
+PUT /conversations/{id}/status
+Changement du statut d'une conversation (archivage).
+Request Body:
+{
+  "status": "ACTIVE|ARCHIVED"
+}
+Response (200 OK):
+{
+  "id": "uuid",
+  "status": "ACTIVE|ARCHIVED",
+  "updated_at": "timestamp"
+}
+POST /conversations/{id}/call (Premium uniquement)
+Initier un appel audio dans une conversation.
+Response (201 Created):
+{
+  "id": "uuid",
+  "conversation_id": "uuid",
+  "status": "REQUESTED",
+  "call_type": "AUDIO",
+  "created_at": "timestamp"
+}
+Notifications
+GET /notifications
+Liste des notifications de l'utilisateur.
+Query Parameters:
+•	is_read (boolean, optional): Filtre par statut de lecture
+•	page (integer, optional): Numéro de page (défaut: 1)
+•	limit (integer, optional): Nombre d'éléments par page (défaut: 20, max: 50)
+Response (200 OK):
+{
+  "total": integer,
+  "page": integer,
+  "limit": integer,
+  "data": [
+    {
+      "id": "uuid",
+      "notification_type": "string",
+      "title": "string",
+      "message": "string",
+      "is_read": true|false,
+      "entity_type": "string|null",
+      "entity_id": "uuid|null",
+      "action_url": "string|null",
+      "created_at": "timestamp"
+    }
+  ],
+  "unread_count": integer
+}
+POST /notifications/{id}/read
+Marquer une notification comme lue.
+Response (200 OK):
+{
+  "id": "uuid",
+  "is_read": true,
+  "read_at": "timestamp"
+}
+POST /notifications/read-all
+Marquer toutes les notifications comme lues.
+Response (200 OK):
+{
+  "unread_count": 0
+}
+GET /notifications/preferences
+Récupération des préférences de notification.
+Response (200 OK):
+{
+  "preferences": [
+    {
+      "notification_type": "string",
+      "email_enabled": true|false,
+      "push_enabled": true|false,
+      "in_app_enabled": true|false
+    }
+  ]
+}
+PUT /notifications/preferences
+Mise à jour des préférences de notification.
+Request Body:
+{
+  "preferences": [
+    {
+      "notification_type": "string",
+      "email_enabled": true|false,
+      "push_enabled": true|false,
+      "in_app_enabled": true|false
+    }
+  ]
+}
+Response (200 OK):
+{
+  "message": "Préférences mises à jour avec succès."
+}
+Abonnements Premium
+GET /subscriptions/plans
+Liste des plans d'abonnement disponibles.
+Response (200 OK):
+{
+  "plans": [
+    {
+      "id": "FREE",
+      "name": "Gratuit",
+      "price": 0,
+      "currency": "EUR",
+      "billing_cycle": "NONE",
+      "features": [
+        {
+          "name": "string",
+          "description": "string",
+          "included": true|false,
+          "limit": integer|null
+        }
+      ]
+    },
+    {
+      "id": "PREMIUM_MONTHLY",
+      "name": "Premium Mensuel",
+      "price": number,
+      "currency": "EUR",
+      "billing_cycle": "MONTHLY",
+      "features": [
+        {
+          "name": "string",
+          "description": "string",
+          "included": true|false,
+          "limit": integer|null
+        }
+      ]
+    },
+    {
+      "id": "PREMIUM_YEARLY",
+      "name": "Premium Annuel",
+      "price": number,
+      "currency": "EUR",
+      "billing_cycle": "YEARLY",
+      "features": [
+        {
+          "name": "string",
+          "description": "string",
+          "included": true|false,
+          "limit": integer|null
+        }
+      ]
+    }
+  ]
+}
+GET /subscriptions/me
+Informations sur l'abonnement actuel de l'utilisateur.
+Response (200 OK):
+{
+  "plan": "FREE|PREMIUM_MONTHLY|PREMIUM_YEARLY",
+  "status": "ACTIVE|CANCELLED|EXPIRED|TRIAL",
+  "start_date": "timestamp",
+  "end_date": "timestamp",
+  "auto_renew": true|false,
+  "payment_provider": "string|null",
+  "payment_id": "string|null",
+  "transactions": [
+    {
+      "id": "uuid",
+      "amount": number,
+      "currency": "string",
+      "transaction_id": "string",
+      "status": "PENDING|COMPLETED|FAILED|REFUNDED",
+      "payment_method": "string",
+      "transaction_date": "timestamp",
+      "receipt_url": "string|null"
+    }
+  ]
+}
+POST /subscriptions/checkout
+Initialisation d'un paiement pour un abonnement Premium.
+Request Body:
+{
+  "plan": "PREMIUM_MONTHLY|PREMIUM_YEARLY",
+  "return_url": "string"
+}
+Response (200 OK):
+{
+  "checkout_url": "string",
+  "checkout_id": "string"
+}
+PUT /subscriptions/me/auto-renew
+Activation/désactivation du renouvellement automatique.
+Request Body:
+{
+  "auto_renew": true|false
+}
+Response (200 OK):
+{
+  "auto_renew": true|false,
+  "updated_at": "timestamp"
+}
+POST /subscriptions/me/cancel
+Annulation de l'abonnement actuel.
+Request Body:
+{
+  "cancel_reason": "string|null"
+}
+Response (200 OK):
+{
+  "status": "CANCELLED",
+  "end_date": "timestamp",
+  "message": "Votre abonnement a été annulé. Vous pouvez continuer à utiliser les fonctionnalités Premium jusqu'à la date de fin."
+}
+Recherche et référence
+GET /search
+Recherche générale (projets et utilisateurs).
+Query Parameters:
+•	q (string): Terme de recherche
+•	type (string, optional): Type de recherche (ALL, PROJECTS, USERS)
+•	page (integer, optional): Numéro de page (défaut: 1)
+•	limit (integer, optional): Nombre d'éléments par page (défaut: 20, max: 50)
+Response (200 OK):
+{
+  "total": integer,
+  "page": integer,
+  "limit": integer,
+  "data": [
+    {
+      "id": "uuid",
+      "type": "PROJECT|USER",
+      "title": "string",
+      "description": "string",
+      "image": "url|null",
+      "creator": {
+        "id": "uuid",
+        "name": "string",
+        "profile_picture": "url|null"
+      }|null,
+      "is_premium": true|false
+    }
+  ]
+}
+GET /saved-searches
+Liste des recherches sauvegardées.
+Response (200 OK):
+{
+  "data": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "search_type": "PROJECT|USER",
+      "filters": {},
+      "is_default": true|false,
+      "created_at": "timestamp",
+      "last_used_at": "timestamp|null"
+    }
+  ]
+}
+POST /saved-searches
+Sauvegarde d'une recherche.
+Request Body:
+{
+  "name": "string",
+  "search_type": "PROJECT|USER",
+  "filters": {},
+  "is_default": true|false
+}
+Response (201 Created):
+{
+  "id": "uuid",
+  "name": "string",
+  "search_type": "PROJECT|USER",
+  "filters": {},
+  "is_default": true|false,
+  "created_at": "timestamp"
+}
+DELETE /saved-searches/{id}
+Suppression d'une recherche sauvegardée.
+Response (204 No Content)
+GET /categories
+Liste des catégories de projets.
+Response (200 OK):
+{
+  "data": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "description": "string|null",
+      "icon": "string|null",
+      "color": "string",
+      "parent": {
+        "id": "uuid",
+        "name": "string"
+      }|null,
+      "children": [
+        {
+          "id": "uuid",
+          "name": "string"
+        }
+      ]
+    }
+  ]
+}
+GET /tags
+Liste des tags disponibles.
+Query Parameters:
+•	search (string, optional): Filtre par nom
+•	limit (integer, optional): Nombre d'éléments (défaut: 20, max: 100)
+Response (200 OK):
+{
+  "data": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "slug": "string"
+    }
+  ]
+}
+GET /expertise
+Liste des domaines d'expertise.
+Response (200 OK):
+{
+  "data": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "description": "string|null",
+      "icon": "string|null"
+    }
+  ]
+}
+Tableau de bord et analytics
+GET /dashboard
+Données du tableau de bord de l'utilisateur.
+Response (200 OK):
+{
+  "profile_views": {
+    "total": integer,
+    "last_7_days": integer,
+    "last_30_days": integer
+  },
+  "project_stats": {
+    "total_projects": integer,
+    "active_projects": integer,
+    "total_views": integer,
+    "total_interests": integer
+  },
+  "messaging_stats": {
+    "active_conversations": integer,
+    "unread_messages": integer,
+    "response_rate": float
+  },
+  "recent_activities": [
+    {
+      "id": "uuid",
+      "activity_type": "string",
+      "entity_type": "string",
+      "entity_id": "uuid",
+      "description": "string",
+      "created_at": "timestamp"
+    }
+  ],
+  "limits": {
+    "projects": {
+      "used": integer,
+      "total": integer
+    },
+    "media_per_project": {
+      "used": integer,
+      "total": integer
+    },
+    "messages": {
+      "used": integer,
+      "total": integer|null
+    },
+    "favorites": {
+      "used": integer,
+      "total": integer|null
+    }
+  }
+}
+GET /projects/{id}/analytics (Premium uniquement)
+Statistiques détaillées d'un projet.
+Response (200 OK):
+{
+  "views": {
+    "total": integer,
+    "by_day": [
+      {
+        "date": "string (YYYY-MM-DD)",
+        "count": integer
+      }
+    ],
+    "by_country": [
+      {
+        "country": "string",
+        "count": integer
+      }
+    ]
+  },
+  "interests": {
+    "total": integer,
+    "by_day": [
+      {
+        "date": "string (YYYY-MM-DD)",
+        "count": integer
+      }
+    ],
+    "conversion_rate": float
+  },
+  "visitors": {
+    "total": integer,
+    "unique": integer,
+    "returning": integer,
+    "avg_view_duration": integer
+  },
+  "recent_viewers": [
+    {
+      "user": {
+        "id": "uuid",
+        "first_name": "string",
+        "last_name": "string",
+        "profile_picture": "url|null",
+        "title": "string|null"
+      }|null,
+      "view_date": "timestamp",
+      "duration": integer|null
+    }
+  ]
+}
+Évaluations
+POST /users/{id}/ratings
+Évaluer un utilisateur.
+Request Body:
+{
+  "rating": float,
+  "comment": "string|null",
+  "is_anonymous": true|false,
+  "project_id": "uuid|null",
+  "conversation_id": "uuid|null",
+  "criteria_ratings": {
+    "communication": float,
+    "reliability": float,
+    "expertise": float
+  }
+}
+Response (201 Created):
+{
+  "id": "uuid",
+  "rating": float,
+  "comment": "string|null",
+  "is_anonymous": true|false,
+  "criteria_ratings": {
+    "communication": float,
+    "reliability": float,
+    "expertise": float
+  },
+  "created_at": "timestamp"
+}
+GET /users/{id}/ratings
+Liste des évaluations d'un utilisateur.
+Query Parameters:
+•	page (integer, optional): Numéro de page (défaut: 1)
+•	limit (integer, optional): Nombre d'éléments par page (défaut: 20, max: 50)
+Response (200 OK):
+{
+  "total": integer,
+  "page": integer,
+  "limit": integer,
+  "data": [
+    {
+      "id": "uuid",
+      "rater": {
+        "id": "uuid",
+        "first_name": "string",
+        "last_name": "string",
+        "profile_picture": "url|null"
+      }|null,
+      "rating": float,
+      "comment": "string|null",
+      "is_anonymous": true|false,
+      "project": {
+        "id": "uuid",
+        "title": "string"
+      }|null,
+      "criteria_ratings": {
+        "communication": float,
+        "reliability": float,
+        "expertise": float
+      },
+      "created_at": "timestamp"
+    }
+  ],
+  "summary": {
+    "avg_rating": float,
+    "rating_count": integer,
+    "distribution": {
+      "1": integer,
+      "2": integer,
+      "3": integer,
+      "4": integer,
+      "5": integer
+    },
+    "criteria_averages": {
+      "communication": float,
+      "reliability": float,
+      "expertise": float
+    }
+  }
+}
+Gestion des erreurs
+Format des erreurs
+{
+  "error": {
+    "status_code": integer,
+    "error_code": "string",
+    "message": "string",
+    "details": [
+      {
+        "field": "string",
+        "message": "string"
+      }
+    ]
+  }
+}
+Codes d'erreur communs
+•	400 Bad Request: Données invalides ou incomplètes
+•	401 Unauthorized: Authentification requise
+•	403 Forbidden: Droits insuffisants
+•	404 Not Found: Ressource introuvable
+•	409 Conflict: Conflit avec l'état actuel
+•	422 Unprocessable Entity: Validation échouée
+•	429 Too Many Requests: Rate limiting
+•	500 Internal Server Error: Erreur serveur
+Codes d'erreur spécifiques
+•	AUTHENTICATION_FAILED: Échec d'authentification
+•	INVALID_CREDENTIALS: Identifiants invalides
+•	TOKEN_EXPIRED: Token expiré
+•	TOKEN_INVALID: Token invalide
+•	PERMISSION_DENIED: Permission refusée
+•	RESOURCE_NOT_FOUND: Ressource introuvable
+•	VALIDATION_ERROR: Erreur de validation
+•	RATE_LIMIT_EXCEEDED: Limite de taux dépassée
+•	SUBSCRIPTION_REQUIRED: Abonnement Premium requis
+•	LIMIT_REACHED: Limite atteinte (projets, messages, etc.)
+•	RESOURCE_CONFLICT: Conflit de ressource
+Limites et restrictions
+Utilisateurs standard (gratuit)
+•	Projets actifs: 2 maximum
+•	Photos par projet: 3 maximum
+•	Tags par projet: 5 maximum
+•	Projets favoris: 15 maximum
+•	Questions par projet: 3 maximum
+•	Messages: 150 par mois
+•	Taille fichiers partagés: 5 Mo
+•	Fichiers partagés: 3 par jour
+•	Recherches sauvegardées: 1 maximum
+Utilisateurs Premium
+•	Projets actifs: 5 maximum
+•	Photos par projet: 10 maximum
+•	Tags par projet: 15 maximum
+•	Projets favoris: illimités
+•	Questions par projet: illimitées
+•	Messages: illimités
+•	Taille fichiers partagés: 50 Mo
+•	Fichiers partagés: illimités
+•	Recherches sauvegardées: 10 maximum
+Versionnement
+L'API est versionnée via le chemin d'URL. La version actuelle est v1. Les changements importants seront introduits dans une nouvelle version (v2, v3, etc.) tandis que les changements mineurs et correctifs seront déployés dans la version existante.
+

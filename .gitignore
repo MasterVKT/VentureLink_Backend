@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.env
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+static/collected/
+
+# Fichiers de Firebase
+config/firebase-admin-sdk*.json
+
+# Environnement virtuel
+env/
+venv/
+ENV/
+
+# Fichiers d'IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Fichiers de test
+.coverage
+htmlcov/
+test_db.sqlite3
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Fichiers divers
+.python-version
+.coverage
+.pytest_cache/
+logs/
+.env
+.env.*
+!.env.example
+.local 

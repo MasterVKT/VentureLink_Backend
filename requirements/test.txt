@@ -1,0 +1,11 @@
+# Importer les dépendances de base
+-r base.txt
+
+# Outils de test
+pytest==7.4.2
+pytest-django==4.5.2
+pytest-cov==4.1.0
+pytest-xdist==3.3.1
+factory-boy==3.3.0
+faker==19.6.2
+coverage==7.3.2 

@@ -1,0 +1,29 @@
+# Django et extensions
+Django==4.2.7
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.0
+django-cors-headers==4.1.0
+django-filter==23.2
+
+# Outils de documentation API
+drf-yasg==1.21.7
+
+# Firebase
+firebase-admin==6.2.0
+
+# Base de données
+psycopg2-binary==2.9.9
+
+# Cache et tâches asynchrones
+redis==5.0.0
+celery==5.3.4
+
+# Utilitaires
+Pillow==10.0.1
+python-dateutil==2.8.2
+requests==2.31.0
+pydantic==2.4.2
+python-dotenv==1.0.0
+
+# Sécurité
+argon2-cffi==23.1.0 

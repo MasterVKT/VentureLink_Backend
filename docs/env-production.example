@@ -1,0 +1,49 @@
+# Configuration pour l'environnement de production
+# ⚠️ ATTENTION : Ce fichier contient des informations sensibles
+# Ne jamais commit ce fichier dans Git !
+
+# Django
+DJANGO_ENV=production
+DJANGO_SECRET_KEY=your-super-secret-production-key-50-chars-minimum
+
+# Base de données PostgreSQL (OBLIGATOIRE en production)
+DB_NAME=venturelink
+DB_USER=venturelink_user
+DB_PASSWORD=your_very_secure_db_password
+DB_HOST=your-db-host.com
+DB_PORT=5432
+
+# Firebase (OBLIGATOIRE en production)
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIREBASE_API_KEY=your-firebase-api-key
+FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+FIREBASE_MESSAGING_SENDER_ID=123456789
+FIREBASE_APP_ID=your-firebase-app-id
+FIREBASE_DATABASE_URL=https://your-project.firebaseio.com
+FIREBASE_CREDENTIALS_PATH=/path/to/firebase-admin-sdk.json
+
+# Redis (OBLIGATOIRE en production)
+REDIS_URL=redis://your-redis-host:6379/0
+
+# Email SMTP (OBLIGATOIRE en production)
+EMAIL_HOST=smtp.mailgun.org
+EMAIL_PORT=587
+EMAIL_HOST_USER=your-email@your-domain.com
+EMAIL_HOST_PASSWORD=your-email-password
+
+# API externes
+EXCHANGE_RATE_API_KEY=your-exchange-rate-api-key
+EXCHANGE_RATE_API_URL=https://api.exchangerate-api.com/v4/latest/
+
+# Paiements (PRODUCTION)
+PAYMENT_SANDBOX_MODE=False
+MYCOOLPAY_PRODUCTION_API_KEY=your-production-payment-key
+MYCOOLPAY_PRODUCTION_WEBHOOK_SECRET=your-production-webhook-secret
+
+# URLs de production
+FRONTEND_URL=https://venturelink.com
+BACKEND_URL=https://api.venturelink.com
+
+# Optionnel
+CURRENCY_CACHE_TIMEOUT=86400 

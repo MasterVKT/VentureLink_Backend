@@ -1,0 +1,34 @@
+# Configuration pour l'environnement de développement
+# Copiez ce fichier vers .env à la racine du projet et ajustez les valeurs
+
+# Django
+DJANGO_ENV=development
+DJANGO_SECRET_KEY=dev-secret-key-change-in-production
+
+# Base de données (SQLite par défaut, pas besoin de configuration)
+# Les paramètres DB_* sont ignorés en développement
+
+# Firebase (optionnel en développement)
+FIREBASE_PROJECT_ID=
+FIREBASE_API_KEY=
+FIREBASE_AUTH_DOMAIN=
+FIREBASE_STORAGE_BUCKET=
+FIREBASE_MESSAGING_SENDER_ID=
+FIREBASE_APP_ID=
+FIREBASE_DATABASE_URL=
+
+# Redis (optionnel, fallback sur cache dummy)
+REDIS_URL=redis://localhost:6379/0
+
+# API externes (optionnelles)
+EXCHANGE_RATE_API_KEY=
+EXCHANGE_RATE_API_URL=https://api.exchangerate-api.com/v4/latest/
+
+# Paiements (mode sandbox par défaut)
+PAYMENT_SANDBOX_MODE=True
+MYCOOLPAY_SANDBOX_API_KEY=
+MYCOOLPAY_SANDBOX_WEBHOOK_SECRET=
+
+# URLs
+FRONTEND_URL=http://localhost:3000
+BACKEND_URL=http://localhost:8000 
