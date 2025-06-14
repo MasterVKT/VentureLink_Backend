@@ -2,7 +2,7 @@
 Views initialization for the users app.
 """
 from apps.users.views.auth_views import (
-    RegisterView, LogoutView, FirebaseAuthView, GoogleAuthView,
+    RegisterView, BusinessRegisterView, LogoutView, FirebaseAuthView, GoogleAuthView,
     FacebookAuthView, PasswordResetView, PasswordResetConfirmView,
     AccountVerificationView, EmailVerificationView
 )

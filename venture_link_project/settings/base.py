@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'apps.core',
     'apps.users',
     'apps.projects',
+    'apps.content.apps.ContentConfig',
     'apps.messaging',
     'apps.notifications.apps.NotificationsConfig',
     'apps.investments.apps.InvestmentsConfig',

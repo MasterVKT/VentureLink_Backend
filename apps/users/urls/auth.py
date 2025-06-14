@@ -9,7 +9,7 @@ from rest_framework_simplejwt.views import (
 )
 
 from apps.users.views import (
-    RegisterView, FacebookAuthView, GoogleAuthView,
+    RegisterView, BusinessRegisterView, FacebookAuthView, GoogleAuthView,
     FirebaseAuthView, PasswordResetView, PasswordResetConfirmView,
     LogoutView, AccountVerificationView, EmailVerificationView,
     CustomTokenRefreshView
@@ -26,6 +26,7 @@ urlpatterns = [
     
     # Connexion/Déconnexion
     path('register/', RegisterView.as_view(), name='register'),
+    path('register/business/', BusinessRegisterView.as_view(), name='business_register'),
     path('logout/', LogoutView.as_view(), name='logout'),
     
     # Authentification sociale

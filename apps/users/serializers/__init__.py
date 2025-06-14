@@ -1,7 +1,7 @@
 from .user_serializer import (
     UserSerializer, UserUpdateSerializer, 
     PasswordChangeSerializer, UserRegistrationSerializer,
-    UserSimpleSerializer
+    UserSimpleSerializer, BusinessUserRegistrationSerializer
 )
 from .profile_serializer import (
     ProfileSerializer, ProfileUpdateSerializer,
@@ -11,6 +11,11 @@ from .profile_serializer import (
     EducationSerializer, EducationCreateUpdateSerializer,
     ExperienceSerializer, ExperienceCreateUpdateSerializer,
     BadgeSerializer
+)
+from .company_profile_serializer import (
+    CompanyProfileSerializer, CompanyProfileUpdateSerializer,
+    CompanyProfileCreateSerializer, CompanyMemberSerializer,
+    CompanyMemberUpdateSerializer, CompanyProfileSimpleSerializer
 )
 from .subscription_serializer import (
     SubscriptionSerializer, SubscriptionTransactionSerializer,

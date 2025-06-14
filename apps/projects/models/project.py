@@ -4,6 +4,7 @@ Models for project categories, tags and projects.
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinLengthValidator, MaxLengthValidator, MinValueValidator
+from django.contrib.contenttypes.fields import GenericRelation
 
 from apps.core.models import TimeStampedModel, UUIDModel
 from apps.users.models import User
@@ -215,6 +216,10 @@ class Project(UUIDModel, TimeStampedModel):
         _('Nombre de favoris'),
         default=0,
     )
+    comments_count = models.PositiveIntegerField(
+        _('Nombre de commentaires'),
+        default=0,
+    )
     published_at = models.DateTimeField(
         _('Date de publication'),
         null=True,
@@ -233,6 +238,14 @@ class Project(UUIDModel, TimeStampedModel):
         null=True,
         blank=True,
         help_text=_('URL d\'une vidéo de présentation (YouTube, Vimeo, etc.)'),
+    )
+    
+    # Relation générique pour les commentaires
+    comments = GenericRelation(
+        'content.Comment',
+        content_type_field='content_type',
+        object_id_field='object_id',
+        related_query_name='project'
     )
 
     class Meta:
@@ -273,4 +286,11 @@ class Project(UUIDModel, TimeStampedModel):
         """
         Un projet est considéré comme publié s'il n'est pas un brouillon et que son statut est ACTIF.
         """
-        return not self.is_draft and self.status == self.STATUS_ACTIVE 
+        return not self.is_draft and self.status == self.STATUS_ACTIVE
+    
+    @property
+    def can_be_commented(self):
+        """
+        Un projet peut être commenté s'il est publié.
+        """
+        return self.is_published 

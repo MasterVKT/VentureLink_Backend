@@ -32,6 +32,7 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('is_active', True)
         extra_fields.setdefault('user_type', 'ADMIN')
+        extra_fields.setdefault('account_type', 'PERSONAL')
         
         if extra_fields.get('is_staff') is not True:
             raise ValueError(_('Un superutilisateur doit avoir is_staff=True.'))
@@ -51,6 +52,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('PROJECT_OWNER', _('Porteur de projet')),
         ('BOTH', _('Les deux')),
         ('ADMIN', _('Administrateur')),
+    )
+    
+    ACCOUNT_TYPE_CHOICES = (
+        ('PERSONAL', _('Personnel')),
+        ('BUSINESS', _('Entreprise')),
     )
     
     LANGUAGE_CHOICES = (
@@ -84,6 +90,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(_('Date d\'inscription'), default=timezone.now)
     
     # Champs spécifiques à VentureLink
+    account_type = models.CharField(
+        _('Type de compte'),
+        max_length=20,
+        choices=ACCOUNT_TYPE_CHOICES,
+        default='PERSONAL',
+        help_text=_('Indique s\'il s\'agit d\'un compte personnel ou entreprise.')
+    )
     user_type = models.CharField(
         _('Type d\'utilisateur'),
         max_length=20,
@@ -166,4 +179,18 @@ class User(AbstractBaseUser, PermissionsMixin):
         """
         Vérifie si l'utilisateur est un porteur de projet.
         """
-        return self.user_type in ['PROJECT_OWNER', 'BOTH'] 
+        return self.user_type in ['PROJECT_OWNER', 'BOTH']
+    
+    @property
+    def is_business_account(self):
+        """
+        Vérifie si l'utilisateur a un compte entreprise.
+        """
+        return self.account_type == 'BUSINESS'
+    
+    @property
+    def is_personal_account(self):
+        """
+        Vérifie si l'utilisateur a un compte personnel.
+        """
+        return self.account_type == 'PERSONAL' 
