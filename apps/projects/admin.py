@@ -39,12 +39,60 @@ class ProjectSkillsNeededInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ('title', 'creator', 'category', 'stage', 'status', 'is_draft', 'is_premium', 'is_featured')
-    list_filter = ('category', 'stage', 'status', 'is_draft', 'is_premium', 'is_featured')
+    list_display = ('title', 'creator', 'category', 'stage', 'status', 'is_draft', 'is_premium', 'is_featured', 'is_verified', 'verified_at')
+    list_filter = ('category', 'stage', 'status', 'is_draft', 'is_premium', 'is_featured', 'is_verified', 'verified_by')
     search_fields = ('title', 'short_description', 'full_description')
-    readonly_fields = ('views_count', 'interests_count', 'favorites_count', 'created_at', 'updated_at')
+    readonly_fields = ('views_count', 'interests_count', 'favorites_count', 'verified_at', 'verified_by', 'created_at', 'updated_at')
     filter_horizontal = ('tags',)
     inlines = [ProjectMediaInline, ProjectNeedsInline, ProjectSkillsNeededInline]
+    
+    fieldsets = (
+        ('Informations générales', {
+            'fields': ('title', 'short_description', 'full_description', 'category', 'tags')
+        }),
+        ('Détails du projet', {
+            'fields': ('stage', 'funding_min', 'funding_max', 'funding_currency', 'location_country', 'location_city', 'video_url')
+        }),
+        ('État et visibilité', {
+            'fields': ('creator', 'status', 'is_draft', 'is_premium', 'is_featured')
+        }),
+        ('Vérification (Administrateurs)', {
+            'fields': ('is_verified', 'verified_at', 'verified_by', 'verification_notes'),
+            'classes': ('collapse',)
+        }),
+        ('Statistiques', {
+            'fields': ('views_count', 'interests_count', 'favorites_count', 'comments_count'),
+            'classes': ('collapse',)
+        }),
+        ('Métadonnées', {
+            'fields': ('created_at', 'updated_at', 'published_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['verify_projects', 'unverify_projects']
+    
+    def verify_projects(self, request, queryset):
+        """Action pour vérifier des projets en masse."""
+        count = 0
+        for project in queryset:
+            if not project.is_verified:
+                project.verify_project(request.user, "Vérification en masse via l'administration")
+                count += 1
+        
+        self.message_user(request, f'{count} projet(s) vérifié(s) avec succès.')
+    verify_projects.short_description = "Vérifier les projets sélectionnés"
+    
+    def unverify_projects(self, request, queryset):
+        """Action pour dévérifier des projets en masse."""
+        count = 0
+        for project in queryset:
+            if project.is_verified:
+                project.unverify_project(request.user, "Dévérification en masse via l'administration")
+                count += 1
+        
+        self.message_user(request, f'{count} projet(s) dévérifié(s) avec succès.')
+    unverify_projects.short_description = "Retirer la vérification des projets sélectionnés"
 
 
 @admin.register(ProjectMedia)

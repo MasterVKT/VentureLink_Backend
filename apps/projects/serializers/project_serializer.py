@@ -44,7 +44,8 @@ class ProjectListSerializer(serializers.ModelSerializer):
             'stage', 'funding_min', 'funding_max', 'funding_currency',
             'location_country', 'location_city', 'creator_name',
             'primary_image_url', 'media_urls', 'views_count', 'interests_count',
-            'favorites_count', 'is_premium', 'is_featured', 'published_at'
+            'favorites_count', 'is_premium', 'is_featured', 'is_verified',
+            'verified_at', 'verification_status_display', 'published_at'
         ]
     
     def get_creator_name(self, obj):
@@ -92,10 +93,12 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
             'funding_currency', 'location_country', 'location_city',
             'creator_id', 'creator_name', 'creator_profile_picture',
             'views_count', 'interests_count', 'favorites_count',
-            'is_premium', 'is_featured', 'is_draft', 'status',
+            'is_premium', 'is_featured', 'is_verified', 'verified_at',
+            'verification_status_display', 'is_draft', 'status',
             'published_at', 'created_at', 'updated_at', 'video_url'
         ]
-        read_only_fields = ['views_count', 'interests_count', 'favorites_count']
+        read_only_fields = ['views_count', 'interests_count', 'favorites_count', 
+                           'is_verified', 'verified_at', 'verification_status_display']
     
     def get_creator_name(self, obj):
         """Return the creator's name."""
@@ -203,6 +206,48 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
         # Update tags if provided
         if tags is not None:
             instance.tags.set(tags)
+        
+        return instance
+
+
+class ProjectVerificationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for project verification by administrators.
+    """
+    verification_notes = serializers.CharField(
+        max_length=1000,
+        required=False,
+        allow_blank=True,
+        help_text=_('Notes optionnelles sur la vérification')
+    )
+    
+    class Meta:
+        model = Project
+        fields = ['is_verified', 'verification_notes']
+    
+    def validate(self, data):
+        """
+        Validate that only staff users can perform verification actions.
+        """
+        request = self.context.get('request')
+        if request and not request.user.is_staff:
+            raise serializers.ValidationError(
+                _('Seuls les administrateurs peuvent effectuer des actions de vérification.')
+            )
+        return data
+    
+    def update(self, instance, validated_data):
+        """
+        Update the project verification status.
+        """
+        verification_notes = validated_data.get('verification_notes', '')
+        is_verified = validated_data.get('is_verified')
+        request_user = self.context['request'].user
+        
+        if is_verified:
+            instance.verify_project(request_user, verification_notes)
+        else:
+            instance.unverify_project(request_user, verification_notes)
         
         return instance
 

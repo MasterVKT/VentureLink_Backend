@@ -2,7 +2,7 @@ from apps.projects.serializers.project_serializer import (
     ProjectCategorySerializer, ProjectTagSerializer,
     ProjectListSerializer, ProjectDetailSerializer,
     ProjectCreateSerializer, ProjectUpdateSerializer,
-    ProjectPublishSerializer
+    ProjectPublishSerializer, ProjectVerificationSerializer
 )
 from apps.projects.serializers.project_media_serializer import (
     ProjectMediaSerializer, ProjectMediaCreateSerializer,

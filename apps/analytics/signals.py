@@ -53,12 +53,14 @@ def update_project_metrics(sender, instance, created, **kwargs):
             user_metrics.save()
     else:
         # Si le projet vient d'être publié
-        if instance.is_published and instance.tracker.has_changed('is_published'):
-            # Mettre à jour les métriques de l'utilisateur
-            if instance.creator:
-                user_metrics, _ = UserMetrics.objects.get_or_create(user=instance.creator)
-                user_metrics.projects_published_count += 1
-                user_metrics.save()
+        # FIXME: Tracker not configured for Project model
+        # if instance.is_published and instance.tracker.has_changed('is_published'):
+        #     # Mettre à jour les métriques de l'utilisateur
+        #     if instance.creator:
+        #         user_metrics, _ = UserMetrics.objects.get_or_create(user=instance.creator)
+        #         user_metrics.projects_published_count += 1
+        #         user_metrics.save()
+        pass
 
 
 @receiver(post_save, sender=ProjectInterest)
@@ -154,10 +156,12 @@ def update_payment_metrics(sender, instance, **kwargs):
 def update_subscription_metrics(sender, instance, created, **kwargs):
     """Met à jour les métriques d'abonnement."""
     # Si l'abonnement vient d'être créé ou a changé de statut
-    if created or instance.tracker.has_changed('status'):
+    # FIXME: Tracker not configured for UserSubscription model
+    # if created or instance.tracker.has_changed('status'):
+    if created:
         if instance.status == 'ACTIVE':
             # Enregistrer l'événement
-            if created or instance.tracker.previous('status') != 'ACTIVE':
+            if created: # or instance.tracker.previous('status') != 'ACTIVE':
                 EventLog.objects.create(
                     event_type=EventLog.EventType.SUBSCRIPTION_STARTED,
                     user=instance.user,
@@ -168,7 +172,7 @@ def update_subscription_metrics(sender, instance, created, **kwargs):
                         'end_date': instance.end_date.isoformat() if instance.end_date else None
                     }
                 )
-        elif instance.status == 'CANCELLED' and instance.tracker.previous('status') == 'ACTIVE':
+        # elif instance.status == 'CANCELLED' and instance.tracker.previous('status') == 'ACTIVE':
             # Enregistrer l'événement d'annulation
             EventLog.objects.create(
                 event_type=EventLog.EventType.SUBSCRIPTION_CANCELED,

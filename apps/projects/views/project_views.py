@@ -17,7 +17,7 @@ from apps.projects.serializers import (
     ProjectCategorySerializer, ProjectTagSerializer,
     ProjectListSerializer, ProjectDetailSerializer,
     ProjectCreateSerializer, ProjectUpdateSerializer,
-    ProjectPublishSerializer
+    ProjectPublishSerializer, ProjectVerificationSerializer
 )
 from apps.projects.services.project_service import ProjectService
 
@@ -66,8 +66,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsPublishedProjectOrCreator]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = [
-        'category', 'stage', 'is_premium', 'is_featured', 'status',
-        'location_country', 'tags', 'funding_min', 'funding_max'
+        'category', 'stage', 'is_premium', 'is_featured', 'is_verified',
+        'status', 'location_country', 'tags', 'funding_min', 'funding_max'
     ]
     search_fields = ['title', 'short_description', 'full_description', 
                      'creator__first_name', 'creator__last_name', 
@@ -124,6 +124,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return ProjectUpdateSerializer
         elif self.action == 'publish':
             return ProjectPublishSerializer
+        elif self.action == 'verify':
+            return ProjectVerificationSerializer
         return ProjectDetailSerializer
 
     def get_permissions(self):
@@ -137,6 +139,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
         elif self.action in ['update', 'partial_update', 'destroy', 'publish']:
             from apps.projects.permissions import IsProjectCreator
             permission_classes = [permissions.IsAuthenticated, IsProjectCreator]
+        elif self.action == 'verify':
+            permission_classes = [permissions.IsAuthenticated, IsAdminUser]
         elif self.action in ['related']:
             permission_classes = [IsPublishedProjectOrCreator]
         else:
@@ -230,6 +234,30 @@ class ProjectViewSet(viewsets.ModelViewSet):
         except PermissionDeniedError as e:
             return Response({'detail': str(e)}, status=status.HTTP_403_FORBIDDEN)
 
+    @action(detail=True, methods=['post'], url_path='verify')
+    def verify(self, request, pk=None):
+        """
+        Verify or unverify a project (admin only).
+        """
+        try:
+            project = self.get_object()
+            serializer = self.get_serializer(project, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            
+            action_type = 'vérifié' if project.is_verified else 'dévérifié'
+            return Response({
+                'detail': _('Le projet a été {} avec succès.'.format(action_type)),
+                'is_verified': project.is_verified,
+                'verified_at': project.verified_at,
+                'verified_by': project.verified_by.get_full_name() if project.verified_by else None,
+                'verification_status_display': project.verification_status_display
+            })
+        except ValidationError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except PermissionDeniedError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
     @action(detail=False, methods=['get'], url_path='my-projects')
     def my_projects(self, request):
         """
@@ -260,6 +288,23 @@ class ProjectViewSet(viewsets.ModelViewSet):
             limit = 10
         
         projects = ProjectService.get_trending_projects(limit=limit, days=days)
+        serializer = ProjectListSerializer(projects, many=True, context={'request': request})
+        
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], url_path='verified')
+    def verified(self, request):
+        """
+        Return verified projects.
+        """
+        limit = request.query_params.get('limit', 10)
+        
+        try:
+            limit = int(limit)
+        except ValueError:
+            limit = 10
+        
+        projects = Project.objects.filter(is_verified=True, is_draft=False).order_by('-verified_at')[:limit]
         serializer = ProjectListSerializer(projects, many=True, context={'request': request})
         
         return Response(serializer.data)

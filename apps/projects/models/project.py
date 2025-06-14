@@ -5,6 +5,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinLengthValidator, MaxLengthValidator, MinValueValidator
 from django.contrib.contenttypes.fields import GenericRelation
+from django.utils import timezone
 
 from apps.core.models import TimeStampedModel, UUIDModel
 from apps.users.models import User
@@ -198,6 +199,34 @@ class Project(UUIDModel, TimeStampedModel):
         default=True,
         help_text=_('Projet en cours d\'édition, non publié'),
     )
+    
+    # Système de vérification
+    is_verified = models.BooleanField(
+        _('Vérifié'),
+        default=False,
+        help_text=_('Projet vérifié et validé par l\'équipe administrative'),
+    )
+    verified_at = models.DateTimeField(
+        _('Date de vérification'),
+        null=True,
+        blank=True,
+        help_text=_('Date à laquelle le projet a été vérifié'),
+    )
+    verified_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='verified_projects',
+        verbose_name=_('Vérifié par'),
+        help_text=_('Administrateur qui a vérifié le projet'),
+    )
+    verification_notes = models.TextField(
+        _('Notes de vérification'),
+        blank=True,
+        help_text=_('Notes internes sur la vérification (visible uniquement aux administrateurs)'),
+    )
+    
     status = models.CharField(
         _('Statut'),
         max_length=20,
@@ -260,7 +289,9 @@ class Project(UUIDModel, TimeStampedModel):
             models.Index(fields=['is_draft']),
             models.Index(fields=['is_premium']),
             models.Index(fields=['is_featured']),
+            models.Index(fields=['is_verified']),
             models.Index(fields=['published_at']),
+            models.Index(fields=['verified_at']),
         ]
 
     def __str__(self):
@@ -293,4 +324,49 @@ class Project(UUIDModel, TimeStampedModel):
         """
         Un projet peut être commenté s'il est publié.
         """
-        return self.is_published 
+        return self.is_published
+    
+    def verify_project(self, verified_by_user, notes=""):
+        """
+        Marque le projet comme vérifié par un administrateur.
+        
+        Args:
+            verified_by_user (User): L'utilisateur administrateur qui effectue la vérification
+            notes (str): Notes optionnelles sur la vérification
+        """
+        if not verified_by_user.is_staff:
+            raise ValueError(_('Seuls les administrateurs peuvent vérifier des projets'))
+        
+        self.is_verified = True
+        self.verified_at = timezone.now()
+        self.verified_by = verified_by_user
+        self.verification_notes = notes
+        self.save()
+    
+    def unverify_project(self, unverified_by_user, notes=""):
+        """
+        Retire la vérification d'un projet.
+        
+        Args:
+            unverified_by_user (User): L'utilisateur administrateur qui retire la vérification
+            notes (str): Notes optionnelles sur le retrait de vérification
+        """
+        if not unverified_by_user.is_staff:
+            raise ValueError(_('Seuls les administrateurs peuvent retirer la vérification des projets'))
+        
+        self.is_verified = False
+        self.verified_at = None
+        self.verified_by = None
+        self.verification_notes = f"Vérification retirée le {timezone.now().strftime('%d/%m/%Y à %H:%M')} par {unverified_by_user.get_full_name()}. {notes}"
+        self.save()
+    
+    @property
+    def verification_status_display(self):
+        """
+        Retourne le statut de vérification formaté pour l'affichage.
+        """
+        if self.is_verified:
+            return _('Vérifié le {}').format(
+                self.verified_at.strftime('%d/%m/%Y') if self.verified_at else _('Date inconnue')
+            )
+        return _('Non vérifié') 
