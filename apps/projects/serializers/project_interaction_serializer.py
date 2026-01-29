@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from apps.users.serializers import UserSerializer
 from apps.projects.models.project_interaction import (
     ProjectInterest, ProjectFavorite, 
-    ProjectQuestion, ProjectQuestionAnswer
+    ProjectQuestion, ProjectQuestionAnswer, ProjectReport
 )
 
 
@@ -184,5 +184,42 @@ class ProjectQuestionAnswerCreateSerializer(serializers.ModelSerializer):
         """
         return ProjectQuestionAnswer.objects.create(
             answered_by=self.context['request'].user,
+            **validated_data
+        ) 
+
+
+class ProjectReportSerializer(serializers.ModelSerializer):
+    """Serializer for ProjectReport model (read/list)."""
+    user = UserSerializer(read_only=True)
+    project_title = serializers.CharField(source='project.title', read_only=True)
+
+    class Meta:
+        model = ProjectReport
+        fields = [
+            'id', 'user', 'project', 'project_title', 'reason', 'description', 'is_resolved', 'created_at'
+        ]
+        read_only_fields = ['id', 'user', 'is_resolved', 'created_at']
+
+
+class ProjectReportCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating a project report."""
+
+    class Meta:
+        model = ProjectReport
+        fields = ['project', 'reason', 'description']
+
+    def validate_project(self, value):
+        user = self.context['request'].user
+        if value.creator == user:
+            raise serializers.ValidationError(_('Vous ne pouvez pas signaler votre propre projet.'))
+        if ProjectReport.objects.filter(user=user, project=value).exists():
+            raise serializers.ValidationError(_('Vous avez déjà signalé ce projet.'))
+        if value.is_draft:
+            raise serializers.ValidationError(_('Vous ne pouvez pas signaler un projet en brouillon.'))
+        return value
+
+    def create(self, validated_data):
+        return ProjectReport.objects.create(
+            user=self.context['request'].user,
             **validated_data
         ) 

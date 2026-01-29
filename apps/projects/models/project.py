@@ -249,6 +249,17 @@ class Project(UUIDModel, TimeStampedModel):
         _('Nombre de commentaires'),
         default=0,
     )
+    
+    # === Nouveau système de signalement ===
+    reports_count = models.PositiveIntegerField(
+        _('Nombre de signalements'),
+        default=0,
+    )
+    is_flagged = models.BooleanField(
+        _('Signalé'),
+        default=False,
+        help_text=_('Indique si le projet a été signalé par plusieurs utilisateurs'),
+    )
     published_at = models.DateTimeField(
         _('Date de publication'),
         null=True,

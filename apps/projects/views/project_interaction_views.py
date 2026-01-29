@@ -10,12 +10,13 @@ from django.utils.translation import gettext_lazy as _
 from apps.core.permissions import IsOwnerOrReadOnly
 from apps.core.exceptions import ResourceNotFoundError, ValidationError, PermissionDeniedError
 from apps.projects.models.project_interaction import (
-    ProjectInterest, ProjectFavorite, ProjectQuestion, ProjectQuestionAnswer
+    ProjectInterest, ProjectFavorite, ProjectQuestion, ProjectQuestionAnswer, ProjectReport
 )
 from apps.projects.serializers import (
     ProjectInterestSerializer, ProjectInterestCreateSerializer, ProjectInterestUpdateSerializer,
     ProjectFavoriteSerializer, ProjectQuestionSerializer, ProjectQuestionCreateSerializer,
-    ProjectQuestionAnswerSerializer, ProjectQuestionAnswerCreateSerializer
+    ProjectQuestionAnswerSerializer, ProjectQuestionAnswerCreateSerializer,
+    ProjectReportSerializer, ProjectReportCreateSerializer
 )
 from apps.projects.services.project_service import ProjectService
 from apps.projects.services.project_interaction_service import ProjectInteractionService
@@ -360,5 +361,59 @@ class ProjectQuestionAnswerViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
             
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT) 
+
+
+class ProjectReportViewSet(viewsets.ModelViewSet):
+    """ViewSet for ProjectReport."""
+    queryset = ProjectReport.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['project', 'reason', 'is_resolved']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        user = self.request.user
+        project_id = self.kwargs.get('project_pk')
+
+        if project_id:
+            try:
+                return ProjectInteractionService.get_project_reports(project_id=project_id, user=user)
+            except PermissionDeniedError:
+                return ProjectReport.objects.none()
+        # Sinon, retourner les signalements faits par l'utilisateur
+        return ProjectReport.objects.filter(user=user)
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return ProjectReportCreateSerializer
+        return ProjectReportSerializer
+
+    def create(self, request, *args, **kwargs):
+        project_id = request.data.get('project')
+        reason = request.data.get('reason')
+        description = request.data.get('description', '')
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            report = ProjectInteractionService.create_project_report(
+                user=request.user,
+                project_id=project_id,
+                reason=reason,
+                description=description
+            )
+            return Response(ProjectReportSerializer(report).data, status=status.HTTP_201_CREATED)
+        except (ValidationError, ResourceNotFoundError) as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # Un utilisateur peut retirer son propre report ou un admin peut le supprimer
+        if request.user != instance.user and not request.user.is_staff:
+            return Response({'detail': _('Vous n\'êtes pas autorisé à supprimer ce signalement.')}, status=status.HTTP_403_FORBIDDEN)
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT) 

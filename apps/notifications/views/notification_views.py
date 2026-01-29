@@ -100,16 +100,36 @@ class NotificationTemplateViewSet(viewsets.ModelViewSet):
 
 class NotificationPreferenceViewSet(mixins.RetrieveModelMixin,
                                     mixins.UpdateModelMixin,
+                                    mixins.ListModelMixin,
                                     viewsets.GenericViewSet):
     """
     API endpoint for user notification preferences.
     """
     serializer_class = NotificationUserPreferenceSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []  # Permissions gérées au niveau des actions
 
     def get_object(self):
         """Get or create preferences for the current user."""
         return NotificationPreferencesService.get_or_create_preferences(self.request.user)
+    
+    def get_queryset(self):
+        """Return preferences for the current user only."""
+        # Pour l'action list, on retourne juste les préférences de l'utilisateur actuel
+        preferences = NotificationPreferencesService.get_or_create_preferences(self.request.user)
+        return NotificationUserPreference.objects.filter(id=preferences.id)
+    
+    def list(self, request, *args, **kwargs):
+        """Return user preferences."""
+        # Vérifier si l'utilisateur est authentifié
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentification requise."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        preferences = self.get_object()
+        serializer = self.get_serializer(preferences)
+        return Response(serializer.data)
     
     def update(self, request, *args, **kwargs):
         """Update user preferences."""

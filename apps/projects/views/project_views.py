@@ -20,6 +20,8 @@ from apps.projects.serializers import (
     ProjectPublishSerializer, ProjectVerificationSerializer
 )
 from apps.projects.services.project_service import ProjectService
+from apps.projects.filters import ProjectFilter
+from apps.projects.models.project_interaction import ProjectFavorite
 
 
 class ProjectCategoryViewSet(viewsets.ModelViewSet):
@@ -65,15 +67,54 @@ class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     permission_classes = [permissions.IsAuthenticated, IsPublishedProjectOrCreator]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = [
-        'category', 'stage', 'is_premium', 'is_featured', 'is_verified',
-        'status', 'location_country', 'tags', 'funding_min', 'funding_max'
-    ]
+    filterset_class = ProjectFilter
     search_fields = ['title', 'short_description', 'full_description', 
                      'creator__first_name', 'creator__last_name', 
                      'tags__name_fr', 'tags__name_en']
     ordering_fields = ['created_at', 'published_at', 'views_count', 'interests_count', 'favorites_count']
     ordering = ['-created_at']
+
+    def _clean_query_params(self, params):
+        """
+        Nettoie et convertit les paramètres de requête aux types appropriés.
+        
+        Args:
+            params (dict): Paramètres de requête bruts
+            
+        Returns:
+            dict: Paramètres nettoyés avec les types corrects
+        """
+        cleaned = params.copy()
+        
+        # Convertir les paramètres booléens
+        boolean_fields = ['is_featured', 'is_premium', 'is_verified']
+        for field in boolean_fields:
+            if field in cleaned:
+                value = cleaned[field].lower().strip()
+                if value in ['true', '1', 'yes', 'on']:
+                    cleaned[field] = True
+                elif value in ['false', '0', 'no', 'off']:
+                    cleaned[field] = False
+                else:
+                    # Supprimer les valeurs invalides
+                    cleaned.pop(field, None)
+        
+        # Convertir les paramètres numériques
+        numeric_fields = ['funding_min', 'funding_max', 'limit', 'page', 'page_size']
+        for field in numeric_fields:
+            if field in cleaned:
+                try:
+                    cleaned[field] = int(cleaned[field])
+                except (ValueError, TypeError):
+                    # Supprimer les valeurs invalides
+                    cleaned.pop(field, None)
+        
+        # Nettoyer les chaînes vides
+        for key, value in list(cleaned.items()):
+            if isinstance(value, str) and not value.strip():
+                cleaned.pop(key, None)
+        
+        return cleaned
 
     def get_queryset(self):
         """
@@ -97,10 +138,13 @@ class ProjectViewSet(viewsets.ModelViewSet):
             'tags', 'media', 'favorites', 'interests'
         )
         
+        # Nettoyage des paramètres de requête pour conversion des types
+        cleaned_filters = self._clean_query_params(self.request.query_params.dict())
+        
         # Appliquer les filtres via le service
         filtered_queryset = ProjectService.get_projects(
             user=self.request.user,
-            filters=self.request.query_params.dict(),
+            filters=cleaned_filters,
             category=self.request.query_params.get('category'),
             search=self.request.query_params.get('search')
         )
@@ -392,34 +436,44 @@ class ProjectViewSet(viewsets.ModelViewSet):
             'locations': locations_data,
         })
 
-    @action(detail=True, methods=['post'], url_path='toggle-favorite')
-    def toggle_favorite(self, request, pk=None):
+    @action(detail=True, methods=['post', 'delete'], url_path='favorite')
+    def favorite(self, request, pk=None):
         """
-        Ajouter/retirer un projet des favoris.
+        Ajouter/retirer un projet des favoris conformément aux specs API.
+        POST pour ajouter avec notes optionnelles, DELETE pour retirer.
         """
         try:
             project = self.get_object()
             user = request.user
             
-            # Vérifier si déjà en favoris
-            if project.favorites.filter(id=user.id).exists():
-                project.favorites.remove(user)
-                is_favorite = False
-                message = "Projet retiré des favoris"
-            else:
-                project.favorites.add(user)
-                is_favorite = True
-                message = "Projet ajouté aux favoris"
+            if request.method == 'POST':
+                notes = request.data.get('notes')
+                favorite, created = ProjectFavorite.objects.get_or_create(
+                    user=user,
+                    project=project,
+                    defaults={'notes': notes}
+                )
+                if not created:
+                    return Response({'detail': 'Projet déjà en favoris'}, status=status.HTTP_400_BAD_REQUEST)
+                
+                return Response({
+                    'id': str(favorite.id),
+                    'project_id': str(project.id),
+                    'notes': favorite.notes,
+                    'created_at': favorite.created_at.isoformat()
+                }, status=status.HTTP_201_CREATED)
             
-            return Response({
-                'is_favorite': is_favorite,
-                'message': message,
-                'favorites_count': project.favorites.count()
-            })
-            
+            else:  # DELETE
+                favorite = ProjectFavorite.objects.filter(user=user, project=project).first()
+                if favorite:
+                    favorite.delete()
+                    return Response(status=status.HTTP_204_NO_CONTENT)
+                else:
+                    return Response({'detail': 'Projet non trouvé dans les favoris'}, status=status.HTTP_404_NOT_FOUND)
+        
         except Exception as e:
             return Response(
-                {'error': 'Erreur lors de la mise à jour des favoris'},
+                {'error': 'Erreur lors de la gestion des favoris: ' + str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

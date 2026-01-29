@@ -175,8 +175,8 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=True, methods=['get'])
-    def stats(self, request, pk=None):
+    @action(detail=True, methods=['get'], url_path='stats', url_name='project-stats')
+    def project_stats(self, request, pk=None):
         """Get investment statistics for a project."""
         project_id = pk
         
@@ -185,13 +185,15 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         
         return Response(stats)
 
-    @action(detail=False, methods=['get'])
-    def stats(self, request):
-        """Get investment statistics for the current user."""
-        user = request.user
-        
-        # Get user statistics
-        stats = InvestmentService.get_user_investments_stats(user)
+    @action(detail=False, methods=['get'], url_path='stats', url_name='general-stats', permission_classes=[])
+    def general_stats(self, request):
+        """Get investment statistics for the current user or general stats for anonymous users."""
+        if request.user.is_authenticated:
+            # Get user statistics
+            stats = InvestmentService.get_user_investments_stats(request.user)
+        else:
+            # Get general public statistics for anonymous users
+            stats = InvestmentService.get_public_investment_stats()
         
         return Response(stats)
 

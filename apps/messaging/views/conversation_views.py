@@ -208,6 +208,20 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
+    @action(detail=False, methods=['get'], url_path='unread_count')
+    def unread_count(self, request):
+        """
+        Get count of unread conversations for the current user.
+        """
+        try:
+            count = ConversationService.get_unread_count(request.user)
+            return Response({'unread_count': count})
+        except Exception as e:
+            return Response(
+                {'detail': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     @action(detail=False, methods=['post'], url_path='direct')
     def direct_conversation(self, request):
         """

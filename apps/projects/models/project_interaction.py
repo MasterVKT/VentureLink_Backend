@@ -150,6 +150,17 @@ class ProjectFavorite(UUIDModel, TimeStampedModel):
             self.project.favorites_count += 1
             self.project.save(update_fields=['favorites_count'])
 
+    def delete(self, *args, **kwargs):
+        """
+        Override delete to decrement favorites count on project.
+        """
+        project = self.project
+        super().delete(*args, **kwargs)
+        project.favorites_count -= 1
+        if project.favorites_count < 0:
+            project.favorites_count = 0
+        project.save(update_fields=['favorites_count'])
+
 
 class ProjectQuestion(UUIDModel, TimeStampedModel):
     """
@@ -237,3 +248,78 @@ class ProjectQuestionAnswer(UUIDModel, TimeStampedModel):
         if not self.question.is_answered:
             self.question.is_answered = True
             self.question.save(update_fields=['is_answered']) 
+
+
+class ProjectReport(UUIDModel, TimeStampedModel):
+    """Model representing a report (flag) made by a user on a project."""
+
+    REASON_SPAM = 'SPAM'
+    REASON_INAPPROPRIATE = 'INAPPROPRIATE'
+    REASON_SCAM = 'SCAM'
+    REASON_OTHER = 'OTHER'
+
+    REASON_CHOICES = [
+        (REASON_SPAM, _('Spam')),
+        (REASON_INAPPROPRIATE, _('Contenu inapproprié')),
+        (REASON_SCAM, _('Arnaque')),
+        (REASON_OTHER, _('Autre')),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='project_reports',
+        verbose_name=_('Utilisateur'),
+    )
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name='reports',
+        verbose_name=_('Projet'),
+    )
+
+    reason = models.CharField(
+        _('Raison'),
+        max_length=20,
+        choices=REASON_CHOICES,
+        default=REASON_OTHER,
+    )
+
+    description = models.TextField(
+        _('Description'),
+        blank=True,
+        help_text=_('Description facultative du problème constaté'),
+    )
+
+    is_resolved = models.BooleanField(
+        _('Résolu'),
+        default=False,
+        help_text=_('Indique si le rapport a été traité par un administrateur'),
+    )
+
+    class Meta:
+        verbose_name = _('Signalement de projet')
+        verbose_name_plural = _('Signalements de projet')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['project']),
+            models.Index(fields=['is_resolved']),
+        ]
+        unique_together = ['user', 'project']  # Un utilisateur ne peut signaler qu'une fois un même projet
+
+    def __str__(self):
+        return f"{self.user.email} signale {self.project.title} ({self.reason})"
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+
+        # Mettre à jour le compteur de signalements du projet
+        if is_new:
+            self.project.reports_count += 1
+            # À partir d'un certain seuil, marquer le projet comme signalé
+            if self.project.reports_count >= 3:
+                self.project.is_flagged = True
+            self.project.save(update_fields=['reports_count', 'is_flagged']) 

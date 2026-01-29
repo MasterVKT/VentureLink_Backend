@@ -195,4 +195,26 @@ class CurrencyService:
         if currency.upper() in ['EUR', 'GBP']:
             return f"{formatted_amount} {symbol}"  # Symbole après le montant
         else:
-            return f"{symbol}{formatted_amount}"   # Symbole avant le montant 
+            return f"{symbol}{formatted_amount}"   # Symbole avant le montant
+    
+    @classmethod
+    def convert_amount(
+        cls, 
+        amount: Union[float, Decimal], 
+        from_currency: str, 
+        to_currency: str
+    ) -> Union[float, Decimal]:
+        """
+        Méthode de classe pour convertir un montant d'une devise à une autre.
+        Alias pour convert_currency pour rétrocompatibilité.
+        
+        Args:
+            amount: Montant à convertir
+            from_currency: Devise source
+            to_currency: Devise cible
+            
+        Returns:
+            float/Decimal: Montant converti
+        """
+        service = cls()
+        return service.convert_currency(amount, from_currency, to_currency) 

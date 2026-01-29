@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'drf_yasg',
     'corsheaders',
     'celery',
@@ -34,12 +35,12 @@ INSTALLED_APPS = [
     'apps.core',
     'apps.users',
     'apps.projects',
-    'apps.content.apps.ContentConfig',
+    'apps.content',
     'apps.messaging',
-    'apps.notifications.apps.NotificationsConfig',
-    'apps.investments.apps.InvestmentsConfig',
-    'apps.payments.apps.PaymentsConfig',
-    'apps.analytics.apps.AnalyticsConfig',
+    'apps.notifications',
+    'apps.investments',
+    'apps.payments',
+    'apps.analytics',
 ]
 
 MIDDLEWARE = [
@@ -121,6 +122,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 MEDIA_URL = 'media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
@@ -132,7 +134,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -207,13 +209,23 @@ BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:8000')
 
 # Payment settings
 PAYMENT_SANDBOX_MODE = os.environ.get('PAYMENT_SANDBOX_MODE', 'True').lower() == 'true'
-MYCOOLPAY_SANDBOX_PUBLIC_KEY = os.environ.get('MYCOOLPAY_SANDBOX_PUBLIC_KEY', '')
-MYCOOLPAY_SANDBOX_PRIVATE_KEY = os.environ.get('MYCOOLPAY_SANDBOX_PRIVATE_KEY', '')
+
+# Clés My-CoolPay pour bac à sable (clé de l'exemple fonctionnel)
+MYCOOLPAY_SANDBOX_PUBLIC_KEY = os.environ.get('MYCOOLPAY_SANDBOX_PUBLIC_KEY', '118a4852-7df8-46d9-834b-23b4ef25aaab')
+MYCOOLPAY_SANDBOX_PRIVATE_KEY = os.environ.get('MYCOOLPAY_SANDBOX_PRIVATE_KEY', 'sandbox_private_key_placeholder')
+
+# Clés My-CoolPay pour production (doivent être définies en production)
 MYCOOLPAY_PUBLIC_KEY = os.environ.get('MYCOOLPAY_PUBLIC_KEY', '')
 MYCOOLPAY_PRIVATE_KEY = os.environ.get('MYCOOLPAY_PRIVATE_KEY', '')
-MYCOOLPAY_SANDBOX_WEBHOOK_SECRET = os.environ.get('MYCOOLPAY_SANDBOX_WEBHOOK_SECRET', '')
+
+# Webhook secrets
+MYCOOLPAY_SANDBOX_WEBHOOK_SECRET = os.environ.get('MYCOOLPAY_SANDBOX_WEBHOOK_SECRET', 'test_webhook_secret_sandbox')
 MYCOOLPAY_PRODUCTION_WEBHOOK_SECRET = os.environ.get('MYCOOLPAY_PRODUCTION_WEBHOOK_SECRET', '')
-MYCOOLPAY_ALLOWED_IPS = os.environ.get('MYCOOLPAY_ALLOWED_IPS', '').split(',')
+
+# IPs autorisées pour les callbacks
+MYCOOLPAY_ALLOWED_IPS = [ip.strip() for ip in os.environ.get('MYCOOLPAY_ALLOWED_IPS', '').split(',') if ip.strip()]
+
+# Mode live/sandbox
 MYCOOLPAY_LIVE_MODE = not PAYMENT_SANDBOX_MODE
 
 # Site URL for callbacks

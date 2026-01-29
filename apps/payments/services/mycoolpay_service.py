@@ -17,7 +17,6 @@ from datetime import datetime
 from apps.payments.models import (
     Payment, 
     PaymentMethod, 
-    PaymentStatus,
     SubscriptionPlan,    # ✅ Modèle unifié
     UserSubscription,    # ✅ Modèle unifié
 )
@@ -33,9 +32,9 @@ class MyCoolPayError(Exception):
 class MyCoolPayService:
     """Service d'intégration My-CoolPay avec modèles unifiés"""
     
-    # URLs d'API
-    SANDBOX_BASE_URL = "https://sandbox.my-coolpay.com/api/v1"
-    PRODUCTION_BASE_URL = "https://api.my-coolpay.com/api/v1"
+    # URLs d'API (utilisant la configuration de l'exemple fonctionnel)
+    SANDBOX_BASE_URL = "https://my-coolpay.com/api"
+    PRODUCTION_BASE_URL = "https://my-coolpay.com/api"
     
     # Devises supportées
     SUPPORTED_CURRENCIES = ['XAF', 'EUR', 'USD', 'XOF']
@@ -67,8 +66,12 @@ class MyCoolPayService:
             self.public_key = getattr(settings, 'MYCOOLPAY_PUBLIC_KEY', '')
             self.private_key = getattr(settings, 'MYCOOLPAY_PRIVATE_KEY', '')
             
-        if not self.public_key or not self.private_key:
-            raise MyCoolPayError("Clés API My-CoolPay manquantes dans les settings")
+        if not self.public_key:
+            raise MyCoolPayError("Clé publique My-CoolPay manquante dans les settings")
+        
+        # Pour sandbox, utiliser une clé privée par défaut si non fournie
+        if sandbox and not self.private_key:
+            self.private_key = 'sandbox_private_key_default'
     
     def _make_request(self, endpoint: str, method: str = 'POST', data: Dict = None) -> Dict[str, Any]:
         """
@@ -85,11 +88,14 @@ class MyCoolPayService:
         Raises:
             MyCoolPayError: En cas d'erreur API
         """
-        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        # Format URL comme dans l'exemple fonctionnel
+        if endpoint == 'paylink':
+            url = f"{self.base_url}/{self.public_key}/paylink"
+        else:
+            url = f"{self.base_url}/{endpoint.lstrip('/')}"
         
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': f'Bearer {self.public_key}',
             'Accept': 'application/json'
         }
         
@@ -308,52 +314,73 @@ class MyCoolPayService:
         
         return hmac.compare_digest(signature, expected_signature)
     
-    def process_subscription_payment(self, user, subscription_plan, payment_method: str) -> Tuple[bool, str, Dict]:
+    def process_subscription_payment(self, user, subscription_plan, phone_number: str, currency='XAF') -> Tuple[bool, str, Dict]:
         """
-        Traiter un paiement d'abonnement
+        Traiter un paiement d'abonnement (version simplifiée basée sur l'exemple fonctionnel)
         
         Args:
             user: Utilisateur
             subscription_plan: Plan d'abonnement
-            payment_method: Méthode de paiement
+            phone_number: Numéro de téléphone de l'utilisateur (format international)
+            currency: Devise du paiement
             
         Returns:
             (success, message, payment_data)
         """
         try:
+            # Obtenir le prix dans la devise demandée
+            amount = subscription_plan.get_price_for_currency(currency)
+            
+            # Validation du numéro de téléphone fourni par le frontend
+            phone = phone_number.strip()
+            if not phone:
+                raise ValueError("Numéro de téléphone manquant")
+            
+            # Vérifier le format basique
+            if len(phone.replace('+', '').replace(' ', '').replace('-', '')) < 9:
+                raise ValueError("Numéro de téléphone invalide (minimum 9 chiffres)")
+            
+            # Normaliser le format
+            if not phone.startswith('+'):
+                # Ajouter le préfixe Cameroun si pas de préfixe international
+                phone = f'+237{phone}'
+            
             # Créer l'enregistrement de paiement
             payment = Payment.objects.create(
                 user=user,
-                amount=subscription_plan.price,
-                currency=subscription_plan.currency or 'XAF',
+                amount=amount,
+                currency=currency,
+                payment_type=Payment.PaymentType.SUBSCRIPTION,
                 description=f"Abonnement {subscription_plan.name}",
-                payment_method=payment_method,
-                status=PaymentStatus.PENDING,
+                status=Payment.PaymentStatus.PENDING,
+                is_test=self.sandbox,
                 metadata={
-                    'subscription_plan_id': subscription_plan.id,
+                    'subscription_plan_id': str(subscription_plan.id),
                     'plan_name': subscription_plan.name,
-                    'duration_months': subscription_plan.duration_months
+                    'duration_days': subscription_plan.duration_days,
+                    'payment_method': 'MYCOOLPAY',
+                    'phone_number': phone
                 }
             )
             
-            # Préparer les données pour My-CoolPay
+            # Préparer les données pour My-CoolPay (format simplifié)
             payment_data = {
-                'transaction_amount': float(payment.amount),
-                'transaction_currency': payment.currency,
-                'transaction_reason': payment.description,
+                'transaction_amount': int(amount),  # My-CoolPay attend un entier
+                'transaction_currency': currency,
+                'transaction_reason': f"Abonnement {subscription_plan.name}",
                 'app_transaction_ref': str(payment.id),
-                'customer_phone_number': user.phone_number or '000000000',
-                'customer_name': f"{user.first_name} {user.last_name}".strip() or user.username,
+                'customer_phone_number': phone,
+                'customer_name': user.get_full_name() or user.email,
                 'customer_email': user.email,
                 'customer_lang': 'fr'
             }
             
-            # Créer le paylink
+            # Créer le paylink (version simplifiée)
             response = self.create_paylink(payment_data)
             
             # Mettre à jour le paiement avec la référence My-CoolPay
-            payment.external_reference = response.get('transaction_ref')
-            payment.payment_url = response.get('payment_url')
+            payment.external_payment_id = response.get('transaction_ref')
+            payment.external_checkout_url = response.get('payment_url')
             payment.save()
             
             return True, "Lien de paiement créé avec succès", {
@@ -399,7 +426,7 @@ class MyCoolPayService:
             
             # Mettre à jour le statut
             if status == 'SUCCESS':
-                payment.status = PaymentStatus.COMPLETED
+                payment.status = Payment.PaymentStatus.COMPLETED
                 payment.completed_at = timezone.now()
                 
                 # Traiter l'abonnement si c'est un paiement d'abonnement
@@ -407,11 +434,11 @@ class MyCoolPayService:
                     self._process_subscription_activation(payment)
                     
             elif status == 'FAILED':
-                payment.status = PaymentStatus.FAILED
+                payment.status = Payment.PaymentStatus.FAILED
             elif status == 'CANCELED':
-                payment.status = PaymentStatus.CANCELLED
+                payment.status = Payment.PaymentStatus.CANCELLED
             
-            payment.external_reference = transaction_ref
+            payment.external_payment_id = transaction_ref
             payment.save()
             
             logger.info(f"Callback traité: Payment {payment.id} -> {status}")
@@ -440,7 +467,7 @@ class MyCoolPayService:
             
             # Créer le nouvel abonnement
             start_date = timezone.now()
-            end_date = start_date + timezone.timedelta(days=plan.duration_months * 30)
+            end_date = start_date + timezone.timedelta(days=plan.duration_days)
             
             subscription = UserSubscription.objects.create(
                 user=payment.user,
@@ -477,6 +504,6 @@ def get_mycoolpay_service() -> MyCoolPayService:
     Returns:
         Instance configurée du service
     """
-    # Utiliser sandbox en mode DEBUG
-    sandbox = getattr(settings, 'DEBUG', True)
+    # Utiliser sandbox en mode DEBUG ou si PAYMENT_SANDBOX_MODE est activé
+    sandbox = getattr(settings, 'DEBUG', True) or getattr(settings, 'PAYMENT_SANDBOX_MODE', True)
     return MyCoolPayService(sandbox=sandbox) 

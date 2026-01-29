@@ -438,4 +438,40 @@ class ConversationService:
                 ignore_conflicts=True  # Ignore duplicates
             )
         
-        return len(read_receipts) 
+        return len(read_receipts)
+    
+    @staticmethod
+    def get_unread_count(user):
+        """
+        Get count of unread conversations for a user.
+        
+        Args:
+            user (User): Current user
+            
+        Returns:
+            int: Number of conversations with unread messages
+        """
+        from apps.messaging.models import Message, MessageRead
+        
+        # Get conversations where user is a participant
+        user_conversations = Conversation.objects.filter(
+            participants=user,
+            conversation_participants__status=ConversationParticipant.STATUS_ACTIVE
+        )
+        
+        unread_count = 0
+        
+        for conversation in user_conversations:
+            # Check if conversation has unread messages
+            has_unread = Message.objects.filter(
+                conversation=conversation
+            ).exclude(
+                read_receipts__user=user
+            ).exclude(
+                sender=user  # Don't count user's own messages
+            ).exists()
+            
+            if has_unread:
+                unread_count += 1
+        
+        return unread_count 

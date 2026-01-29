@@ -15,6 +15,7 @@ from apps.content.serializers import (
     PublicationSerializer, PublicationCreateSerializer, PublicationUpdateSerializer,
     PublicationListSerializer, PublicationMediaSerializer, PublicationLikeSerializer
 )
+from apps.content.filters import PublicationFilter
 
 
 class PublicationViewSet(viewsets.ModelViewSet):
@@ -24,10 +25,10 @@ class PublicationViewSet(viewsets.ModelViewSet):
     queryset = Publication.objects.select_related('author').prefetch_related(
         'media', 'likes__user'
     )
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['publication_type', 'domain', 'status', 'is_featured', 'is_sponsored']
+    filterset_class = PublicationFilter
     search_fields = ['title', 'content', 'summary', 'tags']
     ordering_fields = ['created_at', 'published_at', 'views_count', 'likes_count']
     ordering = ['-published_at', '-created_at']
@@ -230,7 +231,7 @@ class PublicationMediaViewSet(viewsets.ModelViewSet):
     """
     queryset = PublicationMedia.objects.select_related('publication')
     serializer_class = PublicationMediaSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def get_queryset(self):
@@ -290,7 +291,7 @@ class PublicationLikeViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = PublicationLike.objects.select_related('user', 'publication')
     serializer_class = PublicationLikeSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     def get_queryset(self):
         """Filtrer par publication si spécifié."""

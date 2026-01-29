@@ -420,4 +420,59 @@ class InvestmentService:
             'completed_count': completed_investments.count(),
             'rejected_count': rejected_investments.count(),
             'projects_count': user_investments.values('project').distinct().count()
+        }
+
+    @staticmethod
+    def get_public_investment_stats():
+        """
+        Get public investment statistics accessible to anonymous users.
+        
+        Returns:
+            Dict with public investment statistics
+        """
+        # Get all completed investments for public statistics
+        completed_investments = Investment.objects.filter(
+            status=Investment.STATUS_COMPLETED
+        )
+        
+        # Calculate total invested amount by type, handling null values
+        total_equity = sum(
+            inv.amount for inv in completed_investments.filter(investment_type=Investment.TYPE_EQUITY)
+            if inv.amount is not None
+        ) or 0
+        
+        total_loan = sum(
+            inv.amount for inv in completed_investments.filter(investment_type=Investment.TYPE_LOAN)
+            if inv.amount is not None
+        ) or 0
+        
+        total_donation = sum(
+            inv.amount for inv in completed_investments.filter(investment_type=Investment.TYPE_DONATION)
+            if inv.amount is not None
+        ) or 0
+        
+        total_convertible = sum(
+            inv.amount for inv in completed_investments.filter(investment_type=Investment.TYPE_CONVERTIBLE_NOTE)
+            if inv.amount is not None
+        ) or 0
+        
+        # Get total invested amount
+        total_invested = total_equity + total_loan + total_donation + total_convertible
+        
+        # Get total number of funded projects
+        funded_projects_count = completed_investments.values('project').distinct().count()
+        
+        # Get total number of investors
+        total_investors_count = completed_investments.values('investor').distinct().count()
+        
+        # Return public statistics with guaranteed numeric values
+        return {
+            'total_invested': float(total_invested) if total_invested else 0.0,
+            'total_equity': float(total_equity) if total_equity else 0.0,
+            'total_loan': float(total_loan) if total_loan else 0.0,
+            'total_donation': float(total_donation) if total_donation else 0.0,
+            'total_convertible_note': float(total_convertible) if total_convertible else 0.0,
+            'funded_projects_count': funded_projects_count,
+            'total_investors_count': total_investors_count,
+            'total_investments_count': completed_investments.count()
         } 

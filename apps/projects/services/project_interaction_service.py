@@ -4,7 +4,7 @@ Service layer for project interactions.
 from apps.core.exceptions import ResourceNotFoundError, ValidationError, PermissionDeniedError
 from apps.projects.models.project_interaction import (
     ProjectInterest, ProjectFavorite, 
-    ProjectQuestion, ProjectQuestionAnswer
+    ProjectQuestion, ProjectQuestionAnswer, ProjectReport
 )
 from apps.projects.services.project_service import ProjectService
 
@@ -258,3 +258,37 @@ class ProjectInteractionService:
         )
         
         return answer 
+
+    @staticmethod
+    def create_project_report(user, project_id, reason, description=""):
+        """
+        Create a project report from a user.
+        """
+        project = ProjectService.get_project_by_id(project_id, user=None)
+
+        # Prevent creator from reporting own project
+        if project.creator == user:
+            raise ValidationError("Vous ne pouvez pas signaler votre propre projet.")
+
+        # Prevent duplicate
+        if ProjectReport.objects.filter(user=user, project=project).exists():
+            raise ValidationError("Vous avez déjà signalé ce projet.")
+
+        # Prevent reporting drafts
+        if project.is_draft:
+            raise ValidationError("Vous ne pouvez pas signaler un projet en brouillon.")
+
+        return ProjectReport.objects.create(
+            user=user,
+            project=project,
+            reason=reason,
+            description=description
+        )
+
+    @staticmethod
+    def get_project_reports(project_id, user=None):
+        """Return all reports for a project (admin or project owner)."""
+        project = ProjectService.get_project_by_id(project_id, user)
+        if user != project.creator and (not user or not user.is_staff):
+            raise PermissionDeniedError("Vous n'êtes pas autorisé à voir les signalements de ce projet.")
+        return ProjectReport.objects.filter(project=project) 

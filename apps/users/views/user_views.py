@@ -35,8 +35,8 @@ from apps.users.services.subscription_service import SubscriptionService
 class UserViewSet(viewsets.ModelViewSet):
     """ViewSet pour les utilisateurs."""
     queryset = User.objects.all()
-    permission_classes = [IsAuthenticated]
-    http_method_names = ['get', 'put', 'patch', 'delete']
+    permission_classes = []  # Permissions gérées au niveau des actions
+    http_method_names = ['get', 'put', 'patch', 'delete', 'post']
     
     def get_serializer_class(self):
         if self.action == 'update' or self.action == 'partial_update':
@@ -58,6 +58,10 @@ class UserViewSet(viewsets.ModelViewSet):
         return super().get_object()
     
     def check_permissions(self, request):
+        # Vérifier l'authentification pour toutes les actions sauf update_fcm_token qui le gère en interne
+        if self.action != 'update_fcm_token' and not request.user.is_authenticated:
+            self.permission_denied(request, message="Authentification requise.")
+            
         if self.action in ['update', 'partial_update', 'destroy', 'change_password']:
             # Vérifier que l'utilisateur est le propriétaire du compte ou un admin
             obj = self.get_object()
@@ -80,6 +84,39 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['post'], url_path='fcm-token')
+    def update_fcm_token(self, request):
+        """Mettre à jour le token FCM de l'utilisateur."""
+        # Vérifier si l'utilisateur est authentifié
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": _("Authentification requise.")},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        token = request.data.get('token')
+        if not token:
+            return Response(
+                {"detail": _("Token FCM requis.")},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Mettre à jour le token FCM dans le profil utilisateur
+            profile = request.user.profile
+            profile.fcm_token = token
+            profile.save(update_fields=['fcm_token'])
+            
+            return Response(
+                {"message": _("Token FCM mis à jour avec succès.")},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class ProfileViewSet(viewsets.ModelViewSet):

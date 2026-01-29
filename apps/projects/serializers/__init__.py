@@ -17,5 +17,6 @@ from apps.projects.serializers.project_interaction_serializer import (
     ProjectInterestSerializer, ProjectInterestCreateSerializer,
     ProjectInterestUpdateSerializer, ProjectFavoriteSerializer,
     ProjectQuestionSerializer, ProjectQuestionCreateSerializer,
-    ProjectQuestionAnswerSerializer, ProjectQuestionAnswerCreateSerializer
+    ProjectQuestionAnswerSerializer, ProjectQuestionAnswerCreateSerializer,
+    ProjectReportSerializer, ProjectReportCreateSerializer
 ) 

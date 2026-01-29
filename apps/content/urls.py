@@ -20,5 +20,5 @@ router.register(r'publication-likes', PublicationLikeViewSet, basename='publicat
 app_name = 'content'
 
 urlpatterns = [
-    path('api/', include(router.urls)),
+    path('', include(router.urls)),
 ] 

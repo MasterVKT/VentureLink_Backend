@@ -15,12 +15,15 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+
+# Import pour les raccourcis d'URL
+from apps.notifications.views import NotificationPreferenceViewSet
 
 # Configuration de Swagger/OpenAPI
 schema_view = get_schema_view(
@@ -45,16 +48,18 @@ urlpatterns = [
     path('api/redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     
     # API endpoints
+    path('api/v1/', include('apps.projects.urls.api_urls')),
     path('api/v1/auth/', include('apps.users.urls.auth')),
-    path('api/v1/', include('apps.core.urls')),
-    path('api/v1/', include('apps.users.urls')),
-    path('api/v1/', include('apps.projects.urls')),
-    path('api/v1/', include('apps.content.urls')),
-    path('api/v1/', include('apps.payments.urls.api_urls')),
-    path('api/v1/', include('apps.investments.urls')),
-    path('api/v1/', include('apps.messaging.urls')),
-    path('api/v1/', include('apps.notifications.urls')),
+    path('api/v1/users/', include('apps.users.urls')),
+    path('api/v1/content/', include('apps.content.urls')),
+    path('api/v1/payments/', include('apps.payments.urls.api_urls')),
+    path('api/v1/investments/', include('apps.investments.urls')),
+    path('api/v1/messaging/', include('apps.messaging.urls')),
+    path('api/v1/notifications/', include('apps.notifications.urls')),
     path('api/v1/analytics/', include('apps.analytics.urls.api_urls')),
+    
+    # Raccourcis d'URL pour faciliter l'accès frontend
+    re_path(r'^api/v1/notification-preferences/?$', NotificationPreferenceViewSet.as_view({'get': 'list', 'put': 'update', 'patch': 'partial_update'}), name='notification-preferences-shortcut'),
 ]
 
 # Debug toolbar en développement

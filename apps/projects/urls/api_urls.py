@@ -11,6 +11,7 @@ from apps.projects.views import (
     ProjectInterestViewSet, ProjectFavoriteViewSet,
     ProjectQuestionViewSet, ProjectQuestionAnswerViewSet
 )
+from apps.projects.views.project_interaction_views import ProjectReportViewSet
 from apps.projects.views.project_views import ProjectSearchView, TrendingProjectsView
 
 
@@ -22,14 +23,14 @@ router.register(r'tags', ProjectTagViewSet, basename='project-tag')
 router.register(r'interests', ProjectInterestViewSet, basename='project-interest')
 router.register(r'favorites', ProjectFavoriteViewSet, basename='project-favorite')
 router.register(r'questions', ProjectQuestionViewSet, basename='project-question')
+router.register(r'reports', ProjectReportViewSet, basename='project-report')
 
 # Routers imbriqués pour les endpoints liés à un projet
 projects_router = NestedDefaultRouter(router, r'projects', lookup='project')
 projects_router.register(r'media', ProjectMediaViewSet, basename='project-media')
 projects_router.register(r'needs', ProjectNeedsViewSet, basename='project-needs')
 projects_router.register(r'skills', ProjectSkillsNeededViewSet, basename='project-skills')
-projects_router.register(r'interests', ProjectInterestViewSet, basename='project-project-interest')
-projects_router.register(r'questions', ProjectQuestionViewSet, basename='project-project-question')
+projects_router.register(r'reports', ProjectReportViewSet, basename='project-reports')
 
 # Router imbriqué pour les réponses aux questions
 questions_router = NestedDefaultRouter(router, r'questions', lookup='question')

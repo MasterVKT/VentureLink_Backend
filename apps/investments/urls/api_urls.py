@@ -9,6 +9,7 @@ from apps.investments.views import (
     InvestmentViewSet, InvestmentPaymentViewSet,
     RepaymentViewSet, RepaymentScheduleViewSet
 )
+from rest_framework.permissions import AllowAny
 
 # Router principal
 router = DefaultRouter()
@@ -24,6 +25,8 @@ investments_router.register(r'repayments', RepaymentViewSet, basename='investmen
 investments_router.register(r'schedules', RepaymentScheduleViewSet, basename='investment-schedule')
 
 urlpatterns = [
+    # Route directe pour les statistiques générales (sans authentification)
+    path('stats/', InvestmentViewSet.as_view({'get': 'general_stats'}, permission_classes=[AllowAny]), name='investment-stats'),
     path('', include(router.urls)),
     path('', include(investments_router.urls)),
 ] 

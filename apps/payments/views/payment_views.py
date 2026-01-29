@@ -269,19 +269,24 @@ def create_subscription_payment(request):
     """
     Créer un paiement pour un abonnement
     
-    POST /api/v1/payments/subscription/
+    POST /api/v1/payments/subscription/create/
     Body: {
-        "plan_id": 1,
-        "payment_method": "CM_OM" // Optionnel, pour paiement direct
+        "plan_id": "uuid",
+        "phone_number": "+237699999999"  // Obligatoire
     }
     """
     try:
         plan_id = request.data.get('plan_id')
-        payment_method = request.data.get('payment_method', 'PAYLINK')
+        phone_number = request.data.get('phone_number')
         
         if not plan_id:
             return Response({
                 'error': 'plan_id requis'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not phone_number:
+            return Response({
+                'error': 'phone_number requis'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Vérifier le plan
@@ -303,13 +308,17 @@ def create_subscription_payment(request):
                 'error': 'Vous avez déjà un abonnement actif'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Créer le paiement via My-CoolPay
+        # Obtenir la devise de l'utilisateur ou utiliser XAF par défaut
+        currency = getattr(request.user, 'preferred_currency', 'XAF') or 'XAF'
+        
+        # Créer le paiement via My-CoolPay (version simplifiée)
         mycoolpay_service = get_mycoolpay_service()
         
         success, message, payment_data = mycoolpay_service.process_subscription_payment(
             user=request.user,
             subscription_plan=plan,
-            payment_method=payment_method
+            phone_number=phone_number,  # Numéro fourni par le frontend
+            currency=currency
         )
         
         if success:
@@ -332,91 +341,7 @@ def create_subscription_payment(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def initiate_direct_payment(request):
-    """
-    Initier un paiement direct (payin) avec un opérateur spécifique
-    
-    POST /api/v1/payments/payin/
-    Body: {
-        "plan_id": 1,
-        "operator": "CM_OM",
-        "phone_number": "699123456"
-    }
-    """
-    try:
-        plan_id = request.data.get('plan_id')
-        operator = request.data.get('operator')
-        phone_number = request.data.get('phone_number')
-        
-        if not all([plan_id, operator, phone_number]):
-            return Response({
-                'error': 'plan_id, operator et phone_number requis'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Vérifier le plan
-        try:
-            plan = SubscriptionPlan.objects.get(id=plan_id, is_active=True)
-        except SubscriptionPlan.DoesNotExist:
-            return Response({
-                'error': 'Plan d\'abonnement non trouvé'
-            }, status=status.HTTP_404_NOT_FOUND)
-        
-        # Créer l'enregistrement de paiement
-        payment = Payment.objects.create(
-            user=request.user,
-            amount=plan.price,
-            currency=plan.currency or 'XAF',
-            description=f"Abonnement {plan.name}",
-            payment_method=operator,
-            status=PaymentStatus.PENDING,
-            metadata={
-                'subscription_plan_id': plan.id,
-                'plan_name': plan.name,
-                'duration_months': plan.duration_months
-            }
-        )
-        
-        # Initier le paiement via My-CoolPay
-        mycoolpay_service = get_mycoolpay_service()
-        
-        payment_data = {
-            'transaction_amount': float(payment.amount),
-            'transaction_currency': payment.currency,
-            'transaction_reason': payment.description,
-            'app_transaction_ref': str(payment.id),
-            'customer_phone_number': phone_number,
-            'customer_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
-            'customer_email': request.user.email,
-            'customer_lang': 'fr',
-            'transaction_operator': operator
-        }
-        
-        response = mycoolpay_service.initiate_payin(payment_data)
-        
-        # Mettre à jour le paiement
-        payment.external_reference = response.get('transaction_ref')
-        payment.save()
-        
-        return Response({
-            'message': 'Paiement initié avec succès',
-            'payment_id': payment.id,
-            'transaction_ref': response.get('transaction_ref'),
-            'action': response.get('action'),
-            'ussd': response.get('ussd'),
-            'plan': SubscriptionPlanSerializer(plan).data
-        }, status=status.HTTP_201_CREATED)
-        
-    except MyCoolPayError as e:
-        return Response({
-            'error': f'Erreur My-CoolPay: {str(e)}'
-        }, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        logger.error(f"Erreur lors de l'initiation du paiement direct: {str(e)}")
-        return Response({
-            'error': 'Erreur interne du serveur'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+# Fonction supprimée - Paiements directs remplacés par My-CoolPay paylinks uniquement
 
 
 @api_view(['POST'])
@@ -542,7 +467,7 @@ def check_payment_status(request, payment_id):
 @permission_classes([permissions.IsAuthenticated])
 def get_payment_methods(request):
     """
-    Obtenir la liste des méthodes de paiement disponibles
+    Obtenir la liste des méthodes de paiement disponibles (Seulement My-CoolPay)
     
     GET /api/v1/payments/methods/
     """
@@ -550,25 +475,18 @@ def get_payment_methods(request):
     
     methods = [
         {
-            'code': 'PAYLINK',
-            'name': 'Lien de paiement My-CoolPay',
-            'description': 'Redirection vers la page de paiement My-CoolPay',
-            'type': 'redirect'
+            'code': 'MYCOOLPAY',
+            'name': 'My-CoolPay',
+            'description': 'Paiement sécurisé via My-CoolPay (Orange Money, MTN Mobile Money, Cartes bancaires)',
+            'type': 'paylink',
+            'supports_all_operators': True
         }
     ]
     
-    # Ajouter les opérateurs mobiles
-    for code, name in mycoolpay_service.MOBILE_OPERATORS.items():
-        methods.append({
-            'code': code,
-            'name': name,
-            'description': f'Paiement direct via {name}',
-            'type': 'mobile'
-        })
-    
     return Response({
         'methods': methods,
-        'supported_currencies': mycoolpay_service.SUPPORTED_CURRENCIES
+        'supported_currencies': mycoolpay_service.SUPPORTED_CURRENCIES,
+        'message': 'My-CoolPay prend en charge tous les opérateurs de paiement mobile et cartes bancaires'
     })
 
 
