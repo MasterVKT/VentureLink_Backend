@@ -280,3 +280,11 @@ class ProjectPublishSerializer(serializers.ModelSerializer):
         instance.save()
         
         return instance 
+class ProjectSerializer(serializers.ModelSerializer):
+    """
+    General serializer for Project.
+    """
+
+    class Meta:
+        model = Project
+        fields = '__all__'    

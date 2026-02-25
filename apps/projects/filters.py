@@ -29,6 +29,11 @@ class BooleanChoiceFilter(django_filters.BooleanFilter):
 
 
 class ProjectFilter(django_filters.FilterSet):
+
+    from django_filters.rest_framework import DjangoFilterBackend
+
+    
+
     """
     Filterset personnalisé pour les projets avec gestion des types.
     """
@@ -49,11 +54,9 @@ class ProjectFilter(django_filters.FilterSet):
     funding_min = django_filters.NumberFilter(field_name='funding_min', lookup_expr='gte')
     funding_max = django_filters.NumberFilter(field_name='funding_max', lookup_expr='lte')
     
-    # Filtres de relation
-    category = django_filters.ModelChoiceFilter(
-        field_name='category',
-        queryset=ProjectCategory.objects.filter(is_active=True)
-    )
+    # Filtre category — accepte UUID ou nom
+    category = django_filters.CharFilter(method='filter_category')
+
     tags = django_filters.ModelMultipleChoiceFilter(
         field_name='tags',
         queryset=ProjectTag.objects.filter(is_active=True)
@@ -65,6 +68,20 @@ class ProjectFilter(django_filters.FilterSet):
     published_before = django_filters.DateTimeFilter(field_name='published_at', lookup_expr='lte')
     created_after = django_filters.DateTimeFilter(field_name='created_at', lookup_expr='gte')
     created_before = django_filters.DateTimeFilter(field_name='created_at', lookup_expr='lte')
+
+    def filter_category(self, queryset, name, value):
+        import uuid
+        from django.db.models import Q
+        try:
+            uuid.UUID(str(value))
+            # C'est un UUID → filtre par ID
+            return queryset.filter(category__id=value)
+        except ValueError:
+            # C'est un nom → filtre par nom
+            return queryset.filter(
+                Q(category__name_fr__icontains=value) |
+                Q(category__name_en__icontains=value)
+            )
     
     class Meta:
         model = Project
@@ -74,4 +91,4 @@ class ProjectFilter(django_filters.FilterSet):
             'funding_min', 'funding_max', 'creator', 'is_draft',
             'published_after', 'published_before',
             'created_after', 'created_before'
-        ] 
+        ]

@@ -293,16 +293,36 @@ class Project(UUIDModel, TimeStampedModel):
         verbose_name_plural = _('Projets')
         ordering = ['-created_at']
         indexes = [
+            # Index pour les relations
             models.Index(fields=['creator']),
             models.Index(fields=['category']),
             models.Index(fields=['stage']),
+            
+            # Index pour les filtres et tris
             models.Index(fields=['status']),
             models.Index(fields=['is_draft']),
             models.Index(fields=['is_premium']),
             models.Index(fields=['is_featured']),
             models.Index(fields=['is_verified']),
+            
+            # Index pour les dates (tri et filtres temporels)
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['-published_at']),
             models.Index(fields=['published_at']),
             models.Index(fields=['verified_at']),
+            
+            # Index composites pour les requêtes combinées
+            models.Index(fields=['status', '-created_at']),  # Projets publiés triés par date
+            models.Index(fields=['category', 'status']),  # Filtre par catégorie + statut
+            models.Index(fields=['is_verified', 'status']),  # Projets vérifiés et publiés
+            models.Index(fields=['is_featured', 'status']),  # Projets mis en avant
+            
+            # Index pour les filtres de localisation
+            models.Index(fields=['location_country']),
+            models.Index(fields=['location_country', 'location_city']),
+            
+            # Index pour la recherche textuelle
+            models.Index(fields=['title']),
         ]
 
     def __str__(self):
