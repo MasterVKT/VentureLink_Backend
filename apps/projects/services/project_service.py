@@ -52,7 +52,17 @@ class ProjectService:
         
         # Apply category filter
         if category:
-            queryset = queryset.filter(category=category)
+            import uuid
+            try:
+                uuid.UUID(str(category))
+                # C'est un UUID valide → filtre par ID
+                queryset = queryset.filter(category__id=category)
+            except ValueError:
+                # C'est un nom → filtre par nom
+                queryset = queryset.filter(
+                    Q(category__name_fr__icontains=category) |
+                    Q(category__name_en__icontains=category)
+                )
         
         # Apply tag filter
         if 'tags' in filters:

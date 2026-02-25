@@ -12,3 +12,4 @@ MYCOOLPAY_PRIVATE_KEY = env('MYCOOLPAY_PRIVATE_KEY', default='')
 
 # Site URL pour les callbacks
 SITE_URL = env('SITE_URL', default='http://localhost:8000') 
+
