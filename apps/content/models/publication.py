@@ -398,7 +398,7 @@ class PublicationMedia(TimeStampedModel, UUIDModel):
         ]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(order__lte=2),
+                condition=models.Q(order__lte=2),
                 name='publication_media_max_3'
             )
         ]

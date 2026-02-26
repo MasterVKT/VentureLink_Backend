@@ -159,6 +159,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='publicationmedia',
-            constraint=models.CheckConstraint(check=models.Q(('order__lte', 2)), name='publication_media_max_3'),
+            constraint=models.CheckConstraint(condition=models.Q(('order__lte', 2)), name='publication_media_max_3'),
         ),
     ]

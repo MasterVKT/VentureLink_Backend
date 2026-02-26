@@ -12,14 +12,16 @@ class ProjectMediaSerializer(serializers.ModelSerializer):
     Serializer for ProjectMedia model.
     """
     file_url = serializers.SerializerMethodField()
+    uploader_name = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectMedia
         fields = [
             'id', 'file', 'file_url', 'media_type', 'title',
-            'description', 'is_primary', 'order', 'created_at'
+            'description', 'is_primary', 'order', 'size', 'uploader',
+            'uploader_name', 'created_at'
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'created_at', 'size', 'uploader']
 
     def get_file_url(self, obj):
         """Return the absolute URL of the file."""
@@ -28,6 +30,12 @@ class ProjectMediaSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(obj.file.url)
             return obj.file.url
+        return None
+
+    def get_uploader_name(self, obj):
+        """Return the uploader's name if available."""
+        if obj.uploader:
+            return obj.uploader.get_full_name()
         return None
 
 
@@ -150,13 +158,24 @@ class ProjectMediaCreateSerializer(serializers.ModelSerializer):
         Create and return a new project media instance.
         """
         project_id = self.context.get('project_id')
+        request = self.context.get('request')
+        
         if not project_id:
             raise serializers.ValidationError(_('L\'ID du projet est requis.'))
 
-        return ProjectMedia.objects.create(
+        # Get the file to calculate size
+        file = validated_data.get('file')
+        size = file.size if file else None
+
+        # Create media instance with size and uploader
+        media = ProjectMedia.objects.create(
             project_id=project_id,
+            size=size,
+            uploader=request.user if request else None,
             **validated_data
         )
+        
+        return media
 
 
 class ProjectMediaUpdateSerializer(serializers.ModelSerializer):
