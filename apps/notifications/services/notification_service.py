@@ -233,27 +233,162 @@ class NotificationService:
     def mark_all_as_read(user, category=None):
         """
         Mark all user notifications as read.
-        
+
         Args:
             user: User to mark notifications for
             category: Optional category filter
-            
+
         Returns:
             int: Number of notifications marked as read
         """
         now = timezone.now()
-        
+
         # Get unread notifications
         notifications = Notification.objects.filter(
             recipient=user,
             status=NotificationStatus.UNREAD
         )
-        
+
         if category:
             notifications = notifications.filter(category=category)
-        
+
         # Update in bulk
         count = notifications.count()
         notifications.update(status=NotificationStatus.READ, read_at=now, updated_at=now)
-        
-        return count 
+
+        return count
+
+    @staticmethod
+    def send_new_favorite_notification(project_owner, investor, project):
+        """
+        Notifier le propriétaire qu'un utilisateur a ajouté son projet en favori.
+
+        Args:
+            project_owner: User who owns the project
+            investor: User who added the favorite
+            project: Project that was favorited
+
+        Returns:
+            Notification: Created notification or None if not sent
+        """
+        if not project_owner or not investor or not project:
+            return None
+
+        investor_name = investor.get_full_name() or investor.email
+        project_title = project.title
+
+        # Créer le titre et le contenu
+        title = _("Nouveau favori !")
+        content = _("{investor_name} a ajouté '{project_title}' en favoris.").format(
+            investor_name=investor_name,
+            project_title=project_title
+        )
+
+        # Créer la notification
+        notification = NotificationService.create_notification(
+            recipient=project_owner,
+            title=title,
+            content=content,
+            category=NotificationCategory.PROJECT,
+            priority=NotificationPriority.NORMAL,
+            delivery_methods=[NotificationDeliveryMethod.APP, NotificationDeliveryMethod.PUSH],
+            related_object=project,
+            action_url=f"/projects/{project.id}/",
+            icon="favorite"
+        )
+
+        return notification
+
+    @staticmethod
+    def send_new_interest_notification(project_owner, investor, project, message=None):
+        """
+        Notifier le propriétaire d'un nouvel intérêt pour son projet.
+
+        Args:
+            project_owner: User who owns the project
+            investor: User who expressed interest
+            project: Project that received interest
+            message: Optional message from the investor
+
+        Returns:
+            Notification: Created notification or None if not sent
+        """
+        if not project_owner or not investor or not project:
+            return None
+
+        investor_name = investor.get_full_name() or investor.email
+        project_title = project.title
+
+        # Créer le titre et le contenu
+        title = _("Nouvel intérêt pour votre projet !")
+        if message:
+            content = _("{investor_name} est intéressé par '{project_title}'. Message: {message}").format(
+                investor_name=investor_name,
+                project_title=project_title,
+                message=message
+            )
+        else:
+            content = _("{investor_name} est intéressé par '{project_title}'.").format(
+                investor_name=investor_name,
+                project_title=project_title
+            )
+
+        # Créer la notification
+        notification = NotificationService.create_notification(
+            recipient=project_owner,
+            title=title,
+            content=content,
+            category=NotificationCategory.PROJECT,
+            priority=NotificationPriority.HIGH,
+            delivery_methods=[NotificationDeliveryMethod.APP, NotificationDeliveryMethod.PUSH],
+            related_object=project,
+            action_url=f"/projects/{project.id}/",
+            icon="interest"
+        )
+
+        return notification
+
+    @staticmethod
+    def send_investment_notification(project_owner, investor, project, amount, currency):
+        """
+        Notifier le propriétaire d'un nouvel investissement.
+
+        Args:
+            project_owner: User who owns the project
+            investor: User who made the investment
+            project: Project that received investment
+            amount: Investment amount
+            currency: Currency code
+
+        Returns:
+            Notification: Created notification or None if not sent
+        """
+        if not project_owner or not investor or not project:
+            return None
+
+        investor_name = investor.get_full_name() or investor.email
+        project_title = project.title
+
+        # Créer le titre et le contenu
+        title = _("Nouvel investissement !")
+        content = _("{investor_name} a investi {amount} {currency} dans '{project_title}'.").format(
+            investor_name=investor_name,
+            amount=amount,
+            currency=currency,
+            project_title=project_title
+        )
+
+        # Créer la notification
+        notification = NotificationService.create_notification(
+            recipient=project_owner,
+            title=title,
+            content=content,
+            category=NotificationCategory.PROJECT,
+            priority=NotificationPriority.HIGH,
+            delivery_methods=[NotificationDeliveryMethod.APP, NotificationDeliveryMethod.PUSH],
+            related_object=project,
+            action_url=f"/projects/{project.id}/",
+            icon="investment"
+        )
+
+        return notification

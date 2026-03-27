@@ -57,6 +57,7 @@ urlpatterns = [
     path('api/v1/messaging/', include('apps.messaging.urls')),
     path('api/v1/notifications/', include('apps.notifications.urls')),
     path('api/v1/analytics/', include('apps.analytics.urls.api_urls')),
+    path('api/v1/', include('apps.matching.urls')),
     
     # Raccourcis d'URL pour faciliter l'accès frontend
     re_path(r'^api/v1/notification-preferences/?$', NotificationPreferenceViewSet.as_view({'get': 'list', 'put': 'update', 'patch': 'partial_update'}), name='notification-preferences-shortcut'),

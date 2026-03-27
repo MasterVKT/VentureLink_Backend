@@ -159,7 +159,7 @@ class ProjectFavoriteViewSet(viewsets.ModelViewSet):
         """
         project_id = request.data.get('project')
         notes = request.data.get('notes')
-        
+
         try:
             favorite = ProjectInteractionService.add_project_to_favorites(
                 user=request.user,
@@ -172,19 +172,64 @@ class ProjectFavoriteViewSet(viewsets.ModelViewSet):
             )
         except (ResourceNotFoundError, ValidationError) as e:
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
+
+    @action(detail=False, methods=['delete'])
+    def remove(self, request):
+        """
+        Retirer un projet des favoris.
+        """
+        project_id = request.data.get('project')
+
+        if not project_id:
+            return Response(
+                {'detail': 'Le champ project est requis'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            ProjectInteractionService.remove_project_from_favorites(
+                user=request.user,
+                project_id=project_id
+            )
+            return Response(
+                {'detail': 'Favori supprimé'},
+                status=status.HTTP_204_NO_CONTENT
+            )
+        except ResourceNotFoundError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['get'])
+    def check(self, request):
+        """
+        Vérifier si un projet est en favoris.
+        """
+        project_id = request.query_params.get('project')
+
+        if not project_id:
+            return Response(
+                {'detail': 'Le paramètre project est requis'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        is_favorited = ProjectFavorite.objects.filter(
+            user=request.user,
+            project_id=project_id
+        ).exists()
+
+        return Response({'is_favorited': is_favorited})
+
     def destroy(self, request, *args, **kwargs):
         """
         Remove a project from favorites.
         """
         instance = self.get_object()
-        
+
         if request.user != instance.user:
             return Response(
                 {'detail': _('Vous n\'êtes pas autorisé à supprimer ce favori.')},
                 status=status.HTTP_403_FORBIDDEN
             )
-            
+
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
