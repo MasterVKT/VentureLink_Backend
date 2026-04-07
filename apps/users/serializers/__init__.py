@@ -1,5 +1,5 @@
 from .user_serializer import (
-    UserSerializer, UserUpdateSerializer, 
+    UserSerializer, UserUpdateSerializer,
     PasswordChangeSerializer, UserRegistrationSerializer,
     UserSimpleSerializer, BusinessUserRegistrationSerializer
 )
@@ -21,3 +21,4 @@ from .subscription_serializer import (
     SubscriptionSerializer, SubscriptionTransactionSerializer,
     SubscriptionUpdateSerializer, SubscriptionCheckoutSerializer
 )
+from .user_preferences_serializer import UserPreferencesSerializer

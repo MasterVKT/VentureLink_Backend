@@ -42,35 +42,51 @@ class ProjectInteractionService:
     def create_project_interest(user, project_id, data):
         """
         Create a new project interest.
-        
+
         Args:
             user (User): Current user
             project_id (uuid): Project ID
             data (dict): Interest data
-            
+
         Returns:
             ProjectInterest: The created interest
-            
+
         Raises:
             ResourceNotFoundError: If the project doesn't exist
             ValidationError: If the user already expressed interest
         """
         project = ProjectService.get_project_by_id(project_id, user)
-        
+
         # Check if user already expressed interest
         if ProjectInterest.objects.filter(user=user, project=project).exists():
             raise ValidationError("Vous avez déjà exprimé un intérêt pour ce projet.")
-        
+
         # Check if project is not draft
         if project.is_draft:
             raise ValidationError("Vous ne pouvez pas exprimer d'intérêt pour un projet en brouillon.")
-        
+
         interest = ProjectInterest.objects.create(
             user=user,
             project=project,
             **data
         )
-        
+
+        # Enregistrer interaction pour matching IA
+        from apps.matching.services import MatchingService
+        matching_service = MatchingService(user)
+        matching_service.record_interaction(project, 'interest')
+
+        # Envoyer une notification au propriétaire du projet
+        from apps.notifications.services.notification_service import NotificationService
+        if project.creator != user:  # Ne pas notifier si c'est le même utilisateur
+            message = data.get('message')
+            NotificationService.send_new_interest_notification(
+                project_owner=project.creator,
+                investor=user,
+                project=project,
+                message=message
+            )
+
         return interest
     
     @staticmethod
@@ -121,31 +137,45 @@ class ProjectInteractionService:
     def add_project_to_favorites(user, project_id, notes=None):
         """
         Add a project to user's favorites.
-        
+
         Args:
             user (User): Current user
             project_id (uuid): Project ID
             notes (str, optional): User notes
-            
+
         Returns:
             ProjectFavorite: The created favorite
-            
+
         Raises:
             ResourceNotFoundError: If the project doesn't exist
             ValidationError: If already in favorites
         """
         project = ProjectService.get_project_by_id(project_id, user)
-        
+
         # Check if already in favorites
         if ProjectFavorite.objects.filter(user=user, project=project).exists():
             raise ValidationError("Ce projet est déjà dans vos favoris.")
-        
+
         favorite = ProjectFavorite.objects.create(
             user=user,
             project=project,
             notes=notes
         )
-        
+
+        # Enregistrer interaction pour matching IA
+        from apps.matching.services import MatchingService
+        matching_service = MatchingService(user)
+        matching_service.record_interaction(project, 'favorite')
+
+        # Envoyer une notification au propriétaire du projet
+        from apps.notifications.services.notification_service import NotificationService
+        if project.creator != user:  # Ne pas notifier si c'est le même utilisateur
+            NotificationService.send_new_favorite_notification(
+                project_owner=project.creator,
+                investor=user,
+                project=project
+            )
+
         return favorite
     
     @staticmethod

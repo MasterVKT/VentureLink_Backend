@@ -22,7 +22,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+    'django.contrib.postgres',
+
     # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
@@ -30,12 +31,13 @@ INSTALLED_APPS = [
     'drf_yasg',
     'corsheaders',
     'celery',
-    'django_filters', 
-    
+    'django_filters',
+
     # Custom apps
     'apps.core',
     'apps.users',
     'apps.projects',
+    'apps.matching',
     'apps.content',
     'apps.messaging',
     'apps.notifications',

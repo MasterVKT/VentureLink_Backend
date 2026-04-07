@@ -11,4 +11,5 @@ from apps.users.views.user_views import (
 )
 from apps.users.views.device_token_views import DeviceTokenViewSet
 from apps.users.views.token_views import CustomTokenRefreshView
+from apps.users.views.preferences_views import UserPreferencesViewSet
 
