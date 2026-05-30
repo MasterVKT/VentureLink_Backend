@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Script vérification de la cohérence du projet VentureLink.
+Script de vérification de la cohérence du projet VentureLink.
 Vérifie automatiquement les problèmes d'incohérence et génère un rapport.
 """
 
