@@ -450,50 +450,108 @@ class MyCoolPayService:
     
     def _process_subscription_activation(self, payment):
         """
-        Activer un abonnement après paiement réussi
-        
+        Activer un abonnement après paiement réussi.
+        Utilise le modèle unifié UserSubscription (B3.4).
+
         Args:
             payment: Paiement complété
         """
         try:
             plan_id = payment.metadata.get('subscription_plan_id')
             plan = SubscriptionPlan.objects.get(id=plan_id)
-            
-            # Désactiver l'abonnement actuel s'il existe
-            UserSubscription.objects.filter(
-                user=payment.user, 
-                is_active=True
-            ).update(is_active=False, end_date=timezone.now())
-            
-            # Créer le nouvel abonnement
-            start_date = timezone.now()
-            end_date = start_date + timezone.timedelta(days=plan.duration_days)
-            
-            subscription = UserSubscription.objects.create(
+
+            # Chercher un abonnement PENDING lié à ce paiement (souscription initiale)
+            # ou un abonnement ACTIVE avec un pending_upgrade (upgrade)
+            subscription = UserSubscription.objects.filter(
                 user=payment.user,
-                plan=plan,
-                start_date=start_date,
-                end_date=end_date,
-                is_active=True,
-                payment=payment
+                status__in=[
+                    UserSubscription.SubscriptionStatus.PENDING,
+                    UserSubscription.SubscriptionStatus.TRIAL,
+                ]
+            ).select_related('plan').first()
+
+            if subscription:
+                # Cas souscription initiale — activer l'abonnement existant
+                subscription.record_payment(
+                    amount=payment.amount,
+                    payment_date=payment.completed_at or timezone.now(),
+                )
+                logger.info(
+                    "Abonnement activé (souscription initiale): User %s -> Plan %s",
+                    payment.user.id, plan.name
+                )
+            else:
+                # Cas upgrade — chercher l'abonnement actif avec pending_upgrade
+                active_sub = UserSubscription.objects.filter(
+                    user=payment.user,
+                    status=UserSubscription.SubscriptionStatus.ACTIVE,
+                ).first()
+
+                if active_sub and 'pending_upgrade' in active_sub.metadata:
+                    pending = active_sub.metadata['pending_upgrade']
+                    if str(pending.get('payment_id', '')) == str(payment.id):
+                        # Annuler l'ancien abonnement et créer le nouveau
+                        active_sub.cancel(reason=f'Upgrade vers {plan.name}')
+                        new_sub = UserSubscription.create_subscription(
+                            user=payment.user,
+                            plan=plan,
+                            billing_currency=pending.get('billing_currency', 'XAF'),
+                            start_trial=False,
+                        )
+                        new_sub.record_payment(
+                            amount=payment.amount,
+                            payment_date=payment.completed_at or timezone.now(),
+                        )
+                        logger.info(
+                            "Abonnement activé (upgrade): User %s -> Plan %s",
+                            payment.user.id, plan.name
+                        )
+                        subscription = new_sub
+                else:
+                    # Aucun abonnement trouvé — créer un nouveau
+                    new_sub = UserSubscription.create_subscription(
+                        user=payment.user,
+                        plan=plan,
+                        billing_currency=payment.currency,
+                        start_trial=False,
+                    )
+                    new_sub.record_payment(
+                        amount=payment.amount,
+                        payment_date=payment.completed_at or timezone.now(),
+                    )
+                    logger.info(
+                        "Abonnement créé et activé: User %s -> Plan %s",
+                        payment.user.id, plan.name
+                    )
+                    subscription = new_sub
+
+            # Envoyer une notification d'activation
+            try:
+                from apps.notifications.services.notification_service import NotificationService
+                NotificationService.create_from_template(
+                    template_code='subscription_activated',
+                    recipient=payment.user,
+                    context_data={
+                        'plan_name': plan.name,
+                        'end_date': subscription.expires_at.strftime('%d/%m/%Y'),
+                    }
+                )
+            except Exception as notif_err:
+                logger.warning(
+                    "Notification d'activation non envoyée pour user %s: %s",
+                    payment.user.id, notif_err
+                )
+
+        except SubscriptionPlan.DoesNotExist:
+            logger.error(
+                "Plan introuvable lors de l'activation: plan_id=%s payment=%s",
+                payment.metadata.get('subscription_plan_id'), payment.id
             )
-            
-            logger.info(f"Abonnement activé: User {payment.user.id} -> Plan {plan.name}")
-            
-            # Envoyer une notification
-            from apps.notifications.services.notification_service import NotificationService
-            
-            NotificationService.create_from_template(
-                template_code='subscription_activated',
-                recipient=payment.user,
-                context_data={
-                    'plan_name': plan.name,
-                    'end_date': end_date.strftime('%d/%m/%Y')
-                }
-            )
-            
         except Exception as e:
-            logger.error(f"Erreur lors de l'activation de l'abonnement: {str(e)}")
+            logger.exception(
+                "Erreur lors de l'activation de l'abonnement pour payment %s: %s",
+                payment.id, e
+            )
 
 
 # Service global pour l'application

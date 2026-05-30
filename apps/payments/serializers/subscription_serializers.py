@@ -198,3 +198,24 @@ class UserSubscriptionUpdateSerializer(serializers.ModelSerializer):
         
         instance.save()
         return instance 
+
+
+class SubscriptionUpgradeSerializer(serializers.Serializer):
+    """
+    Serializer pour l'upgrade ou le downgrade d'un abonnement.
+    Sprint 3 - B3.4
+    """
+    new_plan_id = serializers.CharField(required=True)
+    billing_currency = serializers.ChoiceField(
+        choices=['EUR', 'XAF', 'USD'],
+        default='XAF'
+    )
+
+    def validate_new_plan_id(self, value):
+        """Valider que le nouveau plan existe et est actif."""
+        from apps.payments.models import SubscriptionPlan
+        try:
+            SubscriptionPlan.objects.get(id=value, is_active=True)
+            return value
+        except SubscriptionPlan.DoesNotExist:
+            raise serializers.ValidationError("Plan d'abonnement introuvable ou inactif.")
