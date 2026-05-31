@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(c:\\Users\\user\\Documents\\VentureLink_ROADMAP\\VentureLink_ROADMAP\\3_BACKEND_ROADMAP/**)"
+    ]
+  },
+  "$version": 4
+}

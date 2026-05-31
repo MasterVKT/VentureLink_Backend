@@ -19,19 +19,22 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.payments.models import (
     Payment, Refund, PaymentStatus,
-    SubscriptionPlan, UserSubscription  # ✅ Nouveaux modèles unifiés
+    SubscriptionPlan, UserSubscription
 )
 from apps.payments.serializers import (
     PaymentSerializer, PaymentCreateSerializer,
     RefundSerializer, RefundCreateSerializer,
-    SubscriptionPlanSerializer, UserSubscriptionSerializer  # ✅ Nouveaux serializers
+    SubscriptionPlanSerializer, UserSubscriptionSerializer
 )
 from apps.payments.services.payment_service import PaymentService
 from apps.payments.services.mycoolpay_service import get_mycoolpay_service, MyCoolPayError
 from apps.core.permissions import IsAdminUser
 from apps.payments.services.webhook_service import WebhookService
+# Sécurité B3.6
+from apps.payments.services.security_service import PaymentSecurityService, PaymentAuditLogger
 
 logger = logging.getLogger(__name__)
+
 
 
 class PaymentViewSet(mixins.RetrieveModelMixin,
@@ -322,6 +325,14 @@ def create_subscription_payment(request):
         )
         
         if success:
+            # Audit log du paiement initié (B3.6)
+            PaymentAuditLogger.log_payment_initiated(
+                user=request.user,
+                amount=plan.get_price_for_currency(currency),
+                currency=currency,
+                reference=str(payment_data.get('transaction_ref', '')),
+                ip_address=PaymentSecurityService.get_client_ip(request),
+            )
             return Response({
                 'message': message,
                 'payment_id': payment_data['payment_id'],
@@ -625,6 +636,7 @@ def mycoolpay_webhook(request):
         payload = request.body.decode('utf-8')
         event_data = json.loads(payload)
     except json.JSONDecodeError:
+        logger.error("Webhook My-CoolPay : payload JSON invalide")
         return Response(
             {"error": "Invalid JSON payload"},
             status=status.HTTP_400_BAD_REQUEST
@@ -637,16 +649,34 @@ def mycoolpay_webhook(request):
     webhook_secret = settings.MYCOOLPAY_PRODUCTION_WEBHOOK_SECRET
     if settings.PAYMENT_SANDBOX_MODE:
         webhook_secret = settings.MYCOOLPAY_SANDBOX_WEBHOOK_SECRET
-    
-    if not WebhookService.verify_signature(payload, signature, webhook_secret):
-        logger.warning("Signature de webhook My-CoolPay invalide")
+
+    # Validation de la signature via le service de sécurité (B3.6)
+    ip_address = PaymentSecurityService.get_client_ip(request)
+    signature_valid = PaymentSecurityService.validator.validate_webhook_signature(
+        payload=request.body,
+        signature=signature,
+        secret=webhook_secret,
+    )
+
+    event_type = event_data.get('event_type', 'unknown')
+    reference = event_data.get('app_transaction_ref', event_data.get('reference', 'unknown'))
+
+    # Audit log de la réception du webhook (B3.6)
+    PaymentAuditLogger.log_webhook_received(event_type, reference, signature_valid)
+
+    if not signature_valid:
+        PaymentAuditLogger.log_invalid_signature(ip_address, '/api/v1/payments/mycoolpay/webhook/')
+        logger.warning(
+            "Webhook My-CoolPay : signature invalide — ip=%s event=%s",
+            ip_address, event_type
+        )
         return Response(
             {"error": "Invalid signature"},
             status=status.HTTP_401_UNAUTHORIZED
         )
     
     # Journaliser la réception de l'événement
-    logger.info(f"Webhook My-CoolPay reçu: {event_data.get('event_type', 'unknown')}")
+    logger.info("Webhook My-CoolPay reçu et validé : %s — ref=%s", event_type, reference)
     
     # Traiter l'événement
     success = WebhookService.process_webhook_event(event_data)

@@ -138,6 +138,17 @@ class WebhookService:
                 if payment.payment_type == Payment.PaymentType.SUBSCRIPTION:
                     from apps.payments.services.subscription_service import SubscriptionService
                     SubscriptionService.activate_subscription_from_payment(payment)
+
+                # B3.6 — Audit trail paiement complété
+                if payment.user:
+                    from apps.payments.services.security_service import PaymentAuditLogger
+                    PaymentAuditLogger.log_payment_completed(
+                        user=payment.user,
+                        payment_id=str(payment.id),
+                        amount=payment.amount,
+                        currency=payment.currency,
+                        reference=transaction_ref,
+                    )
                 
                 # Envoyer une notification à l'utilisateur
                 if payment.user:
@@ -195,6 +206,16 @@ class WebhookService:
                     })
                 
                 payment.save()
+
+                # B3.6 — Audit trail paiement échoué
+                if payment.user:
+                    from apps.payments.services.security_service import PaymentAuditLogger
+                    reason = event_data.get('error_details') or event_data.get('error_code') or 'unknown'
+                    PaymentAuditLogger.log_payment_failed(
+                        user=payment.user,
+                        payment_id=str(payment.id),
+                        reason=reason,
+                    )
                 
                 # Envoyer une notification à l'utilisateur
                 if payment.user:

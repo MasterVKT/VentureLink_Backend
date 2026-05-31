@@ -238,3 +238,187 @@ MYCOOLPAY_LIVE_MODE = not PAYMENT_SANDBOX_MODE
 
 # Site URL for callbacks
 SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000') 
+
+
+# ---------------------------------------------------------------------------
+# Configuration LOGGING — Sprint 3 B3.6 : Logs et Sécurité
+# ---------------------------------------------------------------------------
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+
+    'formatters': {
+        # Format standard pour les logs applicatifs
+        'standard': {
+            'format': '[{asctime}] {levelname} {name} — {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        # Format détaillé pour les logs de sécurité (paiements)
+        'security': {
+            'format': '[{asctime}] {levelname} SECURITY {name} | {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        # Format JSON-like pour faciliter l'ingestion dans des outils (ELK, Sentry)
+        'verbose': {
+            'format': (
+                '[{asctime}] {levelname} {name} '
+                'pid={process:d} tid={thread:d} — {message}'
+            ),
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
+
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+    },
+
+    'handlers': {
+        # Console — actif en développement
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+            'filters': ['require_debug_true'],
+        },
+        # Console production — uniquement WARNING et plus
+        'console_production': {
+            'level': 'WARNING',
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+            'filters': ['require_debug_false'],
+        },
+        # Fichier général de l'application
+        'file_app': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'app.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+        # Fichier dédié aux paiements
+        'file_payments': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'payments.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 10,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+        # Fichier dédié à la sécurité (audit trail)
+        'file_security': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'security.log'),
+            'maxBytes': 20 * 1024 * 1024,  # 20 MB
+            'backupCount': 20,
+            'formatter': 'security',
+            'encoding': 'utf-8',
+        },
+        # Fichier dédié aux erreurs critiques
+        'file_errors': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'errors.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 10,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+        # Null handler pour désactiver certains loggers verbeux
+        'null': {
+            'class': 'logging.NullHandler',
+        },
+    },
+
+    'loggers': {
+        # Logger racine Django
+        'django': {
+            'handlers': ['console', 'console_production', 'file_app'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Requêtes HTTP Django
+        'django.request': {
+            'handlers': ['file_errors', 'console', 'console_production'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        # Sécurité Django
+        'django.security': {
+            'handlers': ['file_security', 'file_errors'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        # Base de données (désactivé en production pour éviter le bruit)
+        'django.db.backends': {
+            'handlers': ['null'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+
+        # --------------- Loggers applicatifs VentureLink ---------------
+
+        # App payments — logs généraux
+        'apps.payments': {
+            'handlers': ['console', 'console_production', 'file_payments'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # App payments — sécurité et audit trail (B3.6)
+        'payments.security': {
+            'handlers': ['file_security', 'file_payments', 'console', 'console_production'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Service My-CoolPay
+        'apps.payments.services.mycoolpay_service': {
+            'handlers': ['file_payments', 'console', 'console_production'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Webhooks
+        'apps.payments.services.webhook_service': {
+            'handlers': ['file_payments', 'file_security', 'console', 'console_production'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # App users
+        'apps.users': {
+            'handlers': ['console', 'console_production', 'file_app'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # App investments
+        'apps.investments': {
+            'handlers': ['console', 'console_production', 'file_app'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # App notifications
+        'apps.notifications': {
+            'handlers': ['console', 'console_production', 'file_app'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Logger racine — capture tout ce qui n'est pas explicitement configuré
+        '': {
+            'handlers': ['console', 'console_production', 'file_app', 'file_errors'],
+            'level': 'WARNING',
+        },
+    },
+}
+
+# Créer le dossier logs s'il n'existe pas (évite les erreurs au démarrage)
+_LOGS_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(_LOGS_DIR, exist_ok=True)
