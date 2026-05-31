@@ -15,6 +15,12 @@ from apps.payments.serializers.subscription_serializers import (
     UserSubscriptionUpdateSerializer
 )
 
+# Serializer B3.2 — Paiement investissement
+from apps.payments.serializers.investment_payment_serializers import (
+    InitiateInvestmentPaymentSerializer,
+    InvestmentPaymentResponseSerializer,
+)
+
 # ATTENTION: Ces alias sont DÉPRÉCIÉS
 # Utilisez directement les nouveaux serializers
 LegacySubscriptionPlanSerializer = PaymentPlanSerializer
@@ -39,4 +45,8 @@ __all__ = [
     'LegacySubscriptionPlanSerializer',     # ❌ DÉPRÉCIÉ
     'LegacySubscriptionSerializer',         # ❌ DÉPRÉCIÉ
     'LegacySubscriptionCreateSerializer',   # ❌ DÉPRÉCIÉ
+
+    # B3.2 — Paiement investissement
+    'InitiateInvestmentPaymentSerializer',
+    'InvestmentPaymentResponseSerializer',
 ] 

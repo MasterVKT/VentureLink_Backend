@@ -25,19 +25,25 @@ def create_initial_investment_history(sender, instance, created, **kwargs):
 @receiver(pre_save, sender=Investment)
 def update_investment_timestamps(sender, instance, **kwargs):
     """
-    Update timestamps based on investment status.
+    Update timestamps based on investment status changes.
+    Only runs on updates (not on creation).
     """
-    if instance.pk:
-        # Get the previous state
+    if not instance.pk:
+        return
+
+    try:
         previous = Investment.objects.get(pk=instance.pk)
-        
-        # If status changed to APPROVED, set approved_at
-        if instance.status == Investment.STATUS_APPROVED and previous.status != Investment.STATUS_APPROVED:
-            instance.approved_at = timezone.now()
-            
-        # If status changed to COMPLETED, set completed_at
-        if instance.status == Investment.STATUS_COMPLETED and previous.status != Investment.STATUS_COMPLETED:
-            instance.completed_at = timezone.now()
+    except Investment.DoesNotExist:
+        # Object is being created for the first time — no previous state
+        return
+
+    # If status changed to APPROVED, set approved_at
+    if instance.status == Investment.STATUS_APPROVED and previous.status != Investment.STATUS_APPROVED:
+        instance.approved_at = timezone.now()
+
+    # If status changed to COMPLETED, set completed_at
+    if instance.status == Investment.STATUS_COMPLETED and previous.status != Investment.STATUS_COMPLETED:
+        instance.completed_at = timezone.now()
 
 
 @receiver(post_save, sender=InvestmentPayment)

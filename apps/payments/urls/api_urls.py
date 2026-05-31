@@ -11,6 +11,7 @@ from apps.payments.views.payment_views import (
     check_payment_status, get_payment_methods, mycoolpay_callback,
     cancel_subscription, get_account_balance, mycoolpay_webhook
 )
+from apps.payments.views.investment_payment_views import InitiateInvestmentPaymentView
 
 # Router pour les ViewSets
 router = DefaultRouter()
@@ -44,7 +45,10 @@ urlpatterns = [
     # Callback My-CoolPay
     path('mycoolpay/callback/', mycoolpay_callback, name='mycoolpay-callback'),
     path('mycoolpay/webhook/', mycoolpay_webhook, name='mycoolpay-webhook'),
-    
+
+    # B3.2 — Initiation paiement investissement
+    path('initiate/', InitiateInvestmentPaymentView.as_view(), name='initiate-investment-payment'),
+
     # Balance (admin seulement)
     path('balance/', get_account_balance, name='account-balance'),
 ] 
