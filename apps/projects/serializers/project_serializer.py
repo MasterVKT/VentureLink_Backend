@@ -35,8 +35,9 @@ class ProjectListSerializer(serializers.ModelSerializer):
     tags = ProjectTagSerializer(many=True, read_only=True)
     creator_name = serializers.SerializerMethodField()
     primary_image_url = serializers.SerializerMethodField()
-    media_urls = serializers.SerializerMethodField()  # 🔥 NOUVEAU : tous les médias
-    
+    media_urls = serializers.SerializerMethodField()
+    progress_percentage = serializers.SerializerMethodField()
+
     class Meta:
         model = Project
         fields = [
@@ -45,20 +46,21 @@ class ProjectListSerializer(serializers.ModelSerializer):
             'location_country', 'location_city', 'creator_name',
             'primary_image_url', 'media_urls', 'views_count', 'interests_count',
             'favorites_count', 'is_premium', 'is_featured', 'is_verified',
-            'verified_at', 'verification_status_display', 'published_at'
+            'verified_at', 'verification_status_display', 'published_at',
+            'progress_percentage'
         ]
-    
+
     def get_creator_name(self, obj):
         """Return the creator's name."""
         return obj.creator.get_full_name()
-    
+
     def get_primary_image_url(self, obj):
         """Return the URL of the primary image if it exists."""
         primary_image = obj.primary_image
         if primary_image and primary_image.file:
             return primary_image.file.url
         return None
-    
+
     def get_media_urls(self, obj):
         """Retourne tous les médias du projet pour le frontend."""
         return [
@@ -74,6 +76,14 @@ class ProjectListSerializer(serializers.ModelSerializer):
             for media in obj.media.order_by('order', '-created_at')
         ]
 
+    def get_progress_percentage(self, obj):
+        """Calculer le pourcentage de financement."""
+        if obj.funding_max and obj.funding_max > 0:
+            # Utiliser funding_min comme estimation du financement actuel
+            percentage = (obj.funding_min / obj.funding_max) * 100
+            return round(percentage, 2)
+        return 0.0
+
 
 class ProjectDetailSerializer(serializers.ModelSerializer):
     """
@@ -84,7 +94,10 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
     creator_name = serializers.SerializerMethodField()
     creator_id = serializers.SerializerMethodField()
     creator_profile_picture = serializers.SerializerMethodField()
-    
+    progress_percentage = serializers.SerializerMethodField()
+    investors_count = serializers.SerializerMethodField()
+    is_favorited = serializers.SerializerMethodField()
+
     class Meta:
         model = Project
         fields = [
@@ -95,24 +108,43 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
             'views_count', 'interests_count', 'favorites_count',
             'is_premium', 'is_featured', 'is_verified', 'verified_at',
             'verification_status_display', 'is_draft', 'status',
-            'published_at', 'created_at', 'updated_at', 'video_url'
+            'published_at', 'created_at', 'updated_at', 'video_url',
+            'progress_percentage', 'investors_count', 'is_favorited'
         ]
-        read_only_fields = ['views_count', 'interests_count', 'favorites_count', 
+        read_only_fields = ['views_count', 'interests_count', 'favorites_count',
                            'is_verified', 'verified_at', 'verification_status_display']
-    
+
     def get_creator_name(self, obj):
         """Return the creator's name."""
         return obj.creator.get_full_name()
-    
+
     def get_creator_id(self, obj):
         """Return the creator's ID."""
         return str(obj.creator.id)
-    
+
     def get_creator_profile_picture(self, obj):
         """Return the creator's profile picture URL if it exists."""
         if hasattr(obj.creator, 'profile') and obj.creator.profile.profile_picture:
             return obj.creator.profile.profile_picture.url
         return None
+
+    def get_progress_percentage(self, obj):
+        """Calculer le pourcentage de financement."""
+        if obj.funding_max and obj.funding_max > 0:
+            percentage = (obj.funding_min / obj.funding_max) * 100
+            return round(percentage, 2)
+        return 0.0
+
+    def get_investors_count(self, obj):
+        """Nombre d'investisseurs uniques."""
+        return obj.interests.count()
+
+    def get_is_favorited(self, obj):
+        """Vérifier si l'utilisateur actuel a mis en favoris."""
+        request = self.context.get('request')
+        if request and hasattr(request, 'user') and request.user.is_authenticated:
+            return obj.favorites.filter(user=request.user).exists()
+        return False
 
 
 class ProjectCreateSerializer(serializers.ModelSerializer):
@@ -280,3 +312,11 @@ class ProjectPublishSerializer(serializers.ModelSerializer):
         instance.save()
         
         return instance 
+class ProjectSerializer(serializers.ModelSerializer):
+    """
+    General serializer for Project.
+    """
+
+    class Meta:
+        model = Project
+        fields = '__all__'    

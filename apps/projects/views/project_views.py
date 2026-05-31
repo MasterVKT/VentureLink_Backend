@@ -14,7 +14,8 @@ from apps.core.exceptions import ResourceNotFoundError, ValidationError, Permiss
 from apps.projects.models.project import Project, ProjectCategory, ProjectTag
 from apps.projects.permissions import IsPublishedProjectOrCreator
 from apps.projects.serializers import (
-    ProjectCategorySerializer, ProjectTagSerializer,
+    ProjectCategorySerializer, ProjectTagSerializer, 
+    ProjectSerializer,
     ProjectListSerializer, ProjectDetailSerializer,
     ProjectCreateSerializer, ProjectUpdateSerializer,
     ProjectPublishSerializer, ProjectVerificationSerializer
@@ -22,12 +23,14 @@ from apps.projects.serializers import (
 from apps.projects.services.project_service import ProjectService
 from apps.projects.filters import ProjectFilter
 from apps.projects.models.project_interaction import ProjectFavorite
+from apps.projects.pagination import ProjectPagination
 
 
 class ProjectCategoryViewSet(viewsets.ModelViewSet):
     """ViewSet for ProjectCategory."""
-    queryset = ProjectCategory.objects.filter(is_active=True)
-    serializer_class = ProjectCategorySerializer
+    queryset = Project.objects.all()
+    serializer_class = ProjectSerializer
+    pagination_class = ProjectPagination
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name_fr', 'name_en']

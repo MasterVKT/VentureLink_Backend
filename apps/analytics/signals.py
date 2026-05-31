@@ -168,8 +168,8 @@ def update_subscription_metrics(sender, instance, created, **kwargs):
                     metadata={
                         'subscription_id': str(instance.id),
                         'plan_name': instance.plan.name,
-                        'start_date': instance.start_date.isoformat() if instance.start_date else None,
-                        'end_date': instance.end_date.isoformat() if instance.end_date else None
+                        'start_date': instance.started_at.isoformat() if instance.started_at else None,
+                        'end_date': instance.expires_at.isoformat() if instance.expires_at else None
                     }
                 )
         # elif instance.status == 'CANCELLED' and instance.tracker.previous('status') == 'ACTIVE':

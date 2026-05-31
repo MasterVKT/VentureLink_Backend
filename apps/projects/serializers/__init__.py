@@ -20,3 +20,5 @@ from apps.projects.serializers.project_interaction_serializer import (
     ProjectQuestionAnswerSerializer, ProjectQuestionAnswerCreateSerializer,
     ProjectReportSerializer, ProjectReportCreateSerializer
 ) 
+
+from .project_serializer import ProjectSerializer

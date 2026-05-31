@@ -16,15 +16,17 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 from apps.payments.models import (
     Payment, Refund, PaymentStatus,
-    SubscriptionPlan, UserSubscription  # ✅ Nouveaux modèles unifiés
+    SubscriptionPlan, UserSubscription
 )
 from apps.payments.serializers import (
     PaymentSerializer, PaymentCreateSerializer,
     RefundSerializer, RefundCreateSerializer,
-    SubscriptionPlanSerializer, UserSubscriptionSerializer  # ✅ Nouveaux serializers
+    SubscriptionPlanSerializer, UserSubscriptionSerializer
 )
 from apps.payments.services.payment_service import PaymentService
 from apps.payments.services.mycoolpay_service import get_mycoolpay_service, MyCoolPayError
@@ -39,18 +41,21 @@ class PaymentViewSet(mixins.RetrieveModelMixin,
                      viewsets.GenericViewSet):
     """
     API endpoint pour la gestion des paiements.
-    
+
     list:
         Récupère la liste des paiements de l'utilisateur connecté.
-        
+
     retrieve:
         Récupère les détails d'un paiement spécifique.
-        
+
     create_payment:
-        Crée un nouveau paiement.
-        
+        Crée un nouveau paiement via My-CoolPay et retourne l'URL de checkout.
+
     refund:
-        Rembourse un paiement existant.
+        Rembourse un paiement existant (total ou partiel).
+
+    check_status:
+        Interroge My-CoolPay pour mettre à jour le statut d'un paiement.
     """
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
@@ -59,14 +64,14 @@ class PaymentViewSet(mixins.RetrieveModelMixin,
     filterset_fields = ['status', 'payment_type', 'is_test']
     ordering_fields = ['created_at', 'completed_at', 'amount']
     ordering = ['-created_at']
-    
+
     def get_queryset(self):
         """Retourne les paiements de l'utilisateur connecté ou tous les paiements pour un admin."""
         user = self.request.user
         if user.is_staff:
             return Payment.objects.all()
         return Payment.objects.filter(user=user)
-    
+
     def get_serializer_class(self):
         """Retourne le serializer approprié en fonction de l'action."""
         if self.action == 'create_payment':
@@ -74,21 +79,42 @@ class PaymentViewSet(mixins.RetrieveModelMixin,
         elif self.action == 'refund':
             return RefundCreateSerializer
         return super().get_serializer_class()
-    
+
+    @swagger_auto_schema(
+        operation_summary="Créer un paiement",
+        operation_description=(
+            "Initie un paiement via My-CoolPay et retourne l'URL de checkout "
+            "vers laquelle rediriger l'utilisateur."
+        ),
+        request_body=PaymentCreateSerializer,
+        responses={
+            201: openapi.Response(
+                description="Paiement créé avec succès",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'payment': openapi.Schema(type=openapi.TYPE_OBJECT),
+                        'checkout_url': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="URL My-CoolPay vers laquelle rediriger l'utilisateur",
+                        ),
+                    },
+                ),
+            ),
+            400: "Données invalides",
+            500: "Erreur interne",
+        },
+        tags=['Paiements'],
+    )
     @action(detail=False, methods=['post'])
     def create_payment(self, request):
         """
         Crée un nouveau paiement et retourne l'URL de paiement.
-        
-        Cette méthode crée un paiement en fonction des données fournies
-        et retourne les informations nécessaires pour rediriger l'utilisateur
-        vers la page de paiement My-CoolPay.
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         try:
-            # Créer le paiement via le service
             payment = PaymentService.create_payment(
                 user=request.user,
                 amount=serializer.validated_data['amount'],
@@ -99,80 +125,103 @@ class PaymentViewSet(mixins.RetrieveModelMixin,
                 success_url=serializer.validated_data.get('success_url'),
                 cancel_url=serializer.validated_data.get('cancel_url'),
                 statement_descriptor=serializer.validated_data.get('statement_descriptor'),
-                is_test=not settings.MYCOOLPAY_LIVE_MODE
+                is_test=not settings.MYCOOLPAY_LIVE_MODE,
             )
-            
-            # Retourner l'URL de paiement et les informations du paiement
             return Response({
                 'payment': PaymentSerializer(payment).data,
-                'checkout_url': payment.external_checkout_url
+                'checkout_url': payment.external_checkout_url,
             }, status=status.HTTP_201_CREATED)
-            
+
         except Exception as e:
             logger.error(f"Erreur lors de la création du paiement: {str(e)}")
             return Response({
                 'error': _("Une erreur est survenue lors de la création du paiement.")
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
+    @swagger_auto_schema(
+        operation_summary="Rembourser un paiement",
+        operation_description=(
+            "Rembourse partiellement ou totalement un paiement complété. "
+            "Si le montant n'est pas spécifié, le remboursement est total."
+        ),
+        request_body=RefundCreateSerializer,
+        responses={
+            200: openapi.Response(
+                description="Remboursement effectué",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'payment': openapi.Schema(type=openapi.TYPE_OBJECT),
+                        'refund': openapi.Schema(type=openapi.TYPE_OBJECT),
+                    },
+                ),
+            ),
+            400: "Paiement non remboursable",
+            500: "Erreur interne",
+        },
+        tags=['Paiements'],
+    )
     @action(detail=True, methods=['post'])
     def refund(self, request, pk=None):
         """
         Rembourse un paiement existant.
-        
-        Cette méthode permet de rembourser partiellement ou totalement un paiement.
-        Si le montant n'est pas spécifié, le remboursement est total.
         """
         payment = self.get_object()
-        
-        # Vérifier que le paiement peut être remboursé
+
         if not payment.can_be_refunded:
             return Response({
                 'error': _("Ce paiement ne peut pas être remboursé.")
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         try:
-            # Effectuer le remboursement via le service
             payment, refund = PaymentService.refund_payment(
                 payment_id=str(payment.id),
                 amount=serializer.validated_data.get('amount'),
                 reason=serializer.validated_data.get('reason'),
-                notes=serializer.validated_data.get('notes')
+                notes=serializer.validated_data.get('notes'),
             )
-            
-            # Retourner les informations du remboursement
             return Response({
                 'payment': PaymentSerializer(payment).data,
-                'refund': RefundSerializer(refund).data
+                'refund': RefundSerializer(refund).data,
             }, status=status.HTTP_200_OK)
-            
+
         except Exception as e:
             logger.error(f"Erreur lors du remboursement du paiement {payment.id}: {str(e)}")
             return Response({
                 'error': _("Une erreur est survenue lors du remboursement.")
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
+    @swagger_auto_schema(
+        operation_summary="Vérifier le statut d'un paiement",
+        operation_description=(
+            "Interroge My-CoolPay pour obtenir le statut le plus récent "
+            "du paiement et met à jour la base de données."
+        ),
+        responses={
+            200: PaymentSerializer,
+            500: "Erreur interne",
+        },
+        tags=['Paiements'],
+    )
     @action(detail=True, methods=['post'])
     def check_status(self, request, pk=None):
         """
         Met à jour et retourne le statut actuel d'un paiement.
-        
-        Cette méthode interroge My-CoolPay pour obtenir le statut le plus récent
-        du paiement et le met à jour dans la base de données.
         """
         payment = self.get_object()
-        
+
         try:
-            # Mettre à jour le statut via le service
             updated_payment = PaymentService.update_payment_status(str(payment.id))
-            
-            # Retourner le paiement mis à jour
-            return Response(PaymentSerializer(updated_payment).data, status=status.HTTP_200_OK)
-            
+            return Response(PaymentSerializer(updated_payment).data,
+                            status=status.HTTP_200_OK)
+
         except Exception as e:
-            logger.error(f"Erreur lors de la vérification du statut du paiement {payment.id}: {str(e)}")
+            logger.error(
+                f"Erreur lors de la vérification du statut du paiement {payment.id}: {str(e)}"
+            )
             return Response({
                 'error': _("Une erreur est survenue lors de la vérification du statut du paiement.")
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -217,52 +266,145 @@ class WebhookViewSet(viewsets.ViewSet):
 
 
 class SubscriptionPlanListView(generics.ListAPIView):
-    """Liste des plans d'abonnement disponibles"""
-    
+    """
+    Liste des plans d'abonnement disponibles.
+
+    Retourne tous les plans actifs ordonnés par prix XAF croissant.
+    Chaque plan inclut les prix en XAF, EUR et USD ainsi que les fonctionnalités incluses.
+    """
     queryset = SubscriptionPlan.objects.filter(is_active=True).order_by('price_xaf')
     serializer_class = SubscriptionPlanSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @swagger_auto_schema(
+        operation_summary="Lister les plans d'abonnement",
+        operation_description=(
+            "Retourne tous les plans d'abonnement actifs avec leurs prix "
+            "en XAF, EUR et USD, leurs fonctionnalités et leurs limites."
+        ),
+        responses={200: SubscriptionPlanSerializer(many=True)},
+        tags=['Abonnements'],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
 
 class UserSubscriptionView(generics.RetrieveAPIView):
-    """Récupérer l'abonnement actuel de l'utilisateur"""
-    
+    """
+    Récupérer l'abonnement actif de l'utilisateur connecté.
+
+    Retourne l'abonnement ACTIVE ou TRIAL de l'utilisateur,
+    ou un message indiquant l'absence d'abonnement.
+    """
     serializer_class = UserSubscriptionSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+
+    @swagger_auto_schema(
+        operation_summary="Abonnement actif de l'utilisateur",
+        operation_description=(
+            "Retourne l'abonnement actif (ACTIVE ou TRIAL) de l'utilisateur connecté. "
+            "Si aucun abonnement actif, retourne has_subscription: false."
+        ),
+        responses={
+            200: openapi.Response(
+                description="Abonnement actif ou message d'absence",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'id': openapi.Schema(type=openapi.TYPE_STRING),
+                        'status': openapi.Schema(type=openapi.TYPE_STRING),
+                        'has_subscription': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    },
+                ),
+            ),
+        },
+        tags=['Abonnements'],
+    )
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
+
     def get_object(self):
         try:
             return UserSubscription.objects.get(
                 user=self.request.user,
-                status__in=['ACTIVE', 'TRIAL']
+                status__in=['ACTIVE', 'TRIAL'],
             )
         except UserSubscription.DoesNotExist:
             return None
-    
+
     def retrieve(self, request, *args, **kwargs):
         subscription = self.get_object()
         if subscription:
             serializer = self.get_serializer(subscription)
             return Response(serializer.data)
-        else:
-            return Response({
-                'message': 'Aucun abonnement actif',
-                'has_subscription': False
-            })
+        return Response({'message': 'Aucun abonnement actif', 'has_subscription': False})
 
 
 class PaymentHistoryView(generics.ListAPIView):
-    """Historique des paiements de l'utilisateur"""
-    
+    """
+    Historique des paiements de l'utilisateur connecté.
+
+    Retourne tous les paiements de l'utilisateur, du plus récent au plus ancien.
+    """
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+
+    @swagger_auto_schema(
+        operation_summary="Historique des paiements",
+        operation_description="Retourne tous les paiements de l'utilisateur connecté.",
+        responses={200: PaymentSerializer(many=True)},
+        tags=['Paiements'],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
     def get_queryset(self):
         return Payment.objects.filter(
             user=self.request.user
         ).order_by('-created_at')
 
 
+@swagger_auto_schema(
+    method='post',
+    operation_summary="Créer un paiement d'abonnement",
+    operation_description=(
+        "Crée un paylink My-CoolPay pour souscrire à un plan d'abonnement. "
+        "Retourne une payment_url vers laquelle rediriger l'utilisateur."
+    ),
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['plan_id', 'phone_number'],
+        properties={
+            'plan_id': openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="ID du plan d'abonnement (ex: basic_monthly)",
+            ),
+            'phone_number': openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="Numéro de téléphone au format international (+237...)",
+            ),
+        },
+    ),
+    responses={
+        201: openapi.Response(
+            description="Lien de paiement créé",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'payment_id': openapi.Schema(type=openapi.TYPE_STRING),
+                    'payment_url': openapi.Schema(type=openapi.TYPE_STRING),
+                    'transaction_ref': openapi.Schema(type=openapi.TYPE_STRING),
+                    'plan': openapi.Schema(type=openapi.TYPE_OBJECT),
+                },
+            ),
+        ),
+        400: "Données invalides ou abonnement déjà actif",
+        404: "Plan non trouvé",
+        500: "Erreur interne",
+    },
+    tags=['Abonnements'],
+)
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def create_subscription_payment(request):
@@ -463,6 +605,30 @@ def check_payment_status(request, payment_id):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@swagger_auto_schema(
+    method='get',
+    operation_summary="Méthodes de paiement disponibles",
+    operation_description=(
+        "Retourne la liste des méthodes de paiement disponibles. "
+        "Actuellement, seul My-CoolPay est supporté (Orange Money, MTN, cartes bancaires)."
+    ),
+    responses={
+        200: openapi.Response(
+            description="Liste des méthodes",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'methods': openapi.Schema(type=openapi.TYPE_ARRAY,
+                                              items=openapi.Schema(type=openapi.TYPE_OBJECT)),
+                    'supported_currencies': openapi.Schema(type=openapi.TYPE_ARRAY,
+                                                           items=openapi.Schema(type=openapi.TYPE_STRING)),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                },
+            ),
+        ),
+    },
+    tags=['Paiements'],
+)
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def get_payment_methods(request):
@@ -534,6 +700,26 @@ def mycoolpay_callback(request):
         return HttpResponse("Internal Server Error", status=500)
 
 
+@swagger_auto_schema(
+    method='post',
+    operation_summary="Annuler l'abonnement actif",
+    operation_description="Annule l'abonnement ACTIVE ou TRIAL de l'utilisateur connecté.",
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'reason': openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="Raison de l'annulation (optionnel)",
+            ),
+        },
+    ),
+    responses={
+        200: openapi.Response(description="Abonnement annulé"),
+        404: "Aucun abonnement actif",
+        500: "Erreur interne",
+    },
+    tags=['Abonnements'],
+)
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def cancel_subscription(request):
@@ -580,6 +766,17 @@ def cancel_subscription(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@swagger_auto_schema(
+    method='get',
+    operation_summary="Solde du compte My-CoolPay",
+    operation_description="Retourne le solde du compte My-CoolPay. Réservé aux administrateurs.",
+    responses={
+        200: openapi.Response(description="Solde du compte"),
+        403: "Accès non autorisé (admin requis)",
+        400: "Erreur My-CoolPay",
+    },
+    tags=['Administration'],
+)
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def get_account_balance(request):
@@ -616,45 +813,74 @@ def get_account_balance(request):
 def mycoolpay_webhook(request):
     """
     Point de terminaison pour les webhooks My-CoolPay.
-    
-    Reçoit et traite les événements de webhook envoyés par My-CoolPay
-    pour mettre à jour les statuts des paiements et abonnements.
+
+    My-CoolPay envoie une requête POST à cette URL lors des événements :
+    - payment.success  : paiement complété
+    - payment.failed   : paiement échoué
+    - payment.refunded : paiement remboursé
+    - subscription.created / renewed / cancelled
+
+    Sécurité :
+    - Vérification de la signature HMAC-SHA256 (header X-MyCoolPay-Signature)
+    - Retourne toujours HTTP 200 pour éviter les retentatives My-CoolPay
+      (sauf en cas de signature invalide → 403)
+
+    POST /api/v1/payments/mycoolpay/webhook/
+    Headers:
+        X-MyCoolPay-Signature: <hmac-sha256-hex>
+    Body (JSON):
+        {
+            "event_type": "payment.success",
+            "transaction_ref": "MCP-...",
+            "app_transaction_ref": "<payment-uuid>",
+            ...
+        }
     """
-    # Récupérer les données du webhook
+    # 1. Lire le corps brut (nécessaire pour la vérification HMAC)
     try:
         payload = request.body.decode('utf-8')
+    except Exception:
+        logger.error("Webhook: impossible de décoder le corps de la requête.")
+        return HttpResponse('Bad Request', status=400)
+
+    # 2. Vérifier la signature HMAC
+    signature = (
+        request.META.get('HTTP_X_MYCOOLPAY_SIGNATURE', '')
+        or request.META.get('HTTP_X_MCP_SIGNATURE', '')
+    )
+
+    webhook_secret = (
+        settings.MYCOOLPAY_SANDBOX_WEBHOOK_SECRET
+        if getattr(settings, 'PAYMENT_SANDBOX_MODE', True)
+        else settings.MYCOOLPAY_PRODUCTION_WEBHOOK_SECRET
+    )
+
+    if not WebhookService.verify_signature(payload, signature, webhook_secret):
+        logger.warning(
+            f"Webhook My-CoolPay: signature invalide ou manquante. "
+            f"IP={request.META.get('REMOTE_ADDR', 'unknown')}"
+        )
+        return HttpResponse('Forbidden', status=403)
+
+    # 3. Parser le JSON
+    try:
         event_data = json.loads(payload)
     except json.JSONDecodeError:
-        return Response(
-            {"error": "Invalid JSON payload"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Récupérer la signature du webhook
-    signature = request.META.get('HTTP_X_MYCOOLPAY_SIGNATURE', '')
-    
-    # Vérifier la signature
-    webhook_secret = settings.MYCOOLPAY_PRODUCTION_WEBHOOK_SECRET
-    if settings.PAYMENT_SANDBOX_MODE:
-        webhook_secret = settings.MYCOOLPAY_SANDBOX_WEBHOOK_SECRET
-    
-    if not WebhookService.verify_signature(payload, signature, webhook_secret):
-        logger.warning("Signature de webhook My-CoolPay invalide")
-        return Response(
-            {"error": "Invalid signature"},
-            status=status.HTTP_401_UNAUTHORIZED
-        )
-    
-    # Journaliser la réception de l'événement
-    logger.info(f"Webhook My-CoolPay reçu: {event_data.get('event_type', 'unknown')}")
-    
-    # Traiter l'événement
-    success = WebhookService.process_webhook_event(event_data)
-    
-    if success:
-        return Response({"status": "success"}, status=status.HTTP_200_OK)
-    else:
-        return Response(
-            {"status": "error", "message": "Event processing failed"},
-            status=status.HTTP_422_UNPROCESSABLE_ENTITY
-        ) 
+        logger.error("Webhook My-CoolPay: JSON invalide.")
+        return HttpResponse('Bad Request', status=400)
+
+    event_type = event_data.get('event_type', 'unknown')
+    logger.info(
+        f"Webhook My-CoolPay reçu: event_type={event_type} "
+        f"IP={request.META.get('REMOTE_ADDR', 'unknown')}"
+    )
+
+    # 4. Traiter l'événement
+    try:
+        WebhookService.process_webhook_event(event_data)
+    except Exception as exc:
+        # On log l'erreur mais on retourne 200 pour éviter les retentatives
+        logger.exception(f"Erreur lors du traitement du webhook {event_type}: {exc}")
+
+    # 5. Toujours retourner 200 OK (My-CoolPay arrête les retentatives)
+    return HttpResponse('OK', status=200) 
